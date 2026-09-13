@@ -1,0 +1,11 @@
+/* Einstiegspunkt fuer das Stylesheet. Wird zu static/app.css kompiliert.
+   Reihenfolge ist bedeutsam: erst Tailwind, dann Tokens, dann Komponenten. */
+
+@import "tailwindcss";
+@import "./theme.css";
+@import "./components.css";
+
+/* Tailwind muss wissen, wo es nach Klassennamen suchen soll.
+   Templates UND Rust-Quellen, denn auch Handler geben teils Klassen zurueck. */
+@source "../../templates";
+@source "../../src";

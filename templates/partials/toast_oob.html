@@ -1,0 +1,11 @@
+{#
+  Out-of-Band-Fragment: htmx setzt es unabhaengig vom eigentlichen Ziel in
+  #toasts ein. So kann jede Antwort nebenbei eine Meldung mitschicken.
+#}
+{% if let Some(toast) = toast %}
+<div id="toasts" hx-swap-oob="beforeend">
+  <div class="toast toast-{{ toast.kind }}" data-autohide>
+    <span>{{ toast.message }}</span>
+  </div>
+</div>
+{% endif %}

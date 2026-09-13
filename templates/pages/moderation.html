@@ -1,0 +1,21 @@
+{% extends "layout/app.html" %}
+{% block title %}Moderation{% endblock %}
+
+{% block main %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">Moderation</h1>
+  <p class="mt-1 text-sm text-muted">Sichtbar ab der Rolle Moderator.</p>
+</div>
+
+<div class="alert alert-info">
+  <div>
+    <p class="font-medium">Platzhalter</p>
+    <p class="mt-1">
+      Diese Seite zeigt nur, wie eine rollengeschützte Route aussieht:
+      der Handler nimmt <code class="code">ModeratorUser</code> statt
+      <code class="code">CurrentUser</code> entgegen — mehr ist nicht nötig.
+      Siehe <code class="code">src/web/moderation.rs</code>.
+    </p>
+  </div>
+</div>
+{% endblock %}

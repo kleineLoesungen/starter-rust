@@ -1,0 +1,129 @@
+{#
+  Detailseite eines Benutzers. Alle Änderungen laufen als normales Formular
+  mit anschließender Weiterleitung — dadurch löst ein Neuladen keine zweite
+  Änderung aus.
+#}
+{% extends "layout/app.html" %}
+{% import "components/macros.html" as ui %}
+{% block title %}{{ bearbeitet.display_name }}{% endblock %}
+
+{% block main %}
+<div class="mb-6">
+  <a href="/admin/users" class="text-sm text-muted hover:text-content">← Alle Benutzer</a>
+  <h1 class="mt-2 text-2xl font-semibold tracking-tight">{{ bearbeitet.display_name }}</h1>
+  <p class="mt-1 text-sm text-muted">
+    {{ bearbeitet.email }} · angelegt am
+    {% call ui::zeit_kurz(bearbeitet.created_at) %}{% endcall %}
+  </p>
+</div>
+
+{% if gespeichert %}
+  <div class="alert alert-success mb-6" role="status">Änderungen gespeichert.</div>
+{% endif %}
+
+{% if let Some(message) = error %}
+  <div class="alert alert-danger mb-6" role="alert">{{ message }}</div>
+{% endif %}
+
+{% if ist_letzter_admin %}
+  <div class="alert alert-info mb-6">
+    <div>
+      <p class="font-medium">Letzter aktiver Administrator</p>
+      <p class="mt-1">
+        Solange es keinen zweiten gibt, lässt sich dieses Konto weder herabstufen
+        noch sperren oder löschen — sonst käme niemand mehr an die Verwaltung.
+      </p>
+    </div>
+  </div>
+{% endif %}
+
+<div class="grid gap-6 lg:grid-cols-2">
+
+  {# --- Stammdaten, Rolle, Status ---------------------------------------- #}
+  <div class="card h-fit">
+    <div class="card-header"><h2 class="card-title">Stammdaten</h2></div>
+    <form class="card-body stack" method="post" action="/admin/users/{{ bearbeitet.id }}">
+
+      <div class="field">
+        <label class="label" for="display_name">Anzeigename</label>
+        <input class="input" type="text" id="display_name" name="display_name"
+               value="{{ bearbeitet.display_name }}" required>
+      </div>
+
+      <div class="field">
+        <label class="label" for="email">E-Mail</label>
+        <input class="input" type="email" id="email" name="email"
+               value="{{ bearbeitet.email }}" required>
+      </div>
+
+      <div class="field">
+        <label class="label" for="role">Rolle</label>
+        <select class="select" id="role" name="role"
+                {% if ist_selbst %}disabled{% endif %}>
+          {% for role in roles %}
+            <option value="{{ role }}" {% if bearbeitet.role == *role %}selected{% endif %}>{{ role.label() }}</option>
+          {% endfor %}
+        </select>
+        {% if ist_selbst %}
+          {# Gesperrte Felder senden nichts — Wert trotzdem mitschicken. #}
+          <input type="hidden" name="role" value="{{ bearbeitet.role }}">
+          <p class="hint">Die eigene Rolle lässt sich hier nicht ändern.</p>
+        {% endif %}
+      </div>
+
+      <label class="row gap-2 text-sm">
+        <input type="checkbox" class="checkbox" name="is_active" value="1"
+               {% if bearbeitet.is_active %}checked{% endif %}
+               {% if ist_selbst %}disabled{% endif %}>
+        Konto ist aktiv
+      </label>
+      {% if ist_selbst %}
+        <input type="hidden" name="is_active" value="1">
+        <p class="hint">Das eigene Konto lässt sich nicht sperren.</p>
+      {% endif %}
+
+      <button type="submit" class="btn btn-primary">Speichern</button>
+    </form>
+  </div>
+
+  <div class="stack">
+
+    {# --- Passwort zurücksetzen ----------------------------------------- #}
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Passwort zurücksetzen</h2></div>
+      <form class="card-body stack" method="post" action="/admin/users/{{ bearbeitet.id }}/password">
+        <div class="field">
+          <label class="label" for="password">Neues Passwort</label>
+          <input class="input" type="password" id="password" name="password"
+                 required minlength="{{ min_password_len }}" autocomplete="new-password">
+          <p class="hint">
+            Mindestens {{ min_password_len }} Zeichen. Bestehende Anmeldungen dieses
+            Kontos bleiben aktiv, bis sie ablaufen.
+          </p>
+        </div>
+        <button type="submit" class="btn btn-secondary">Passwort setzen</button>
+      </form>
+    </div>
+
+    {# --- Löschen -------------------------------------------------------- #}
+    <div class="card">
+      <div class="card-header"><h2 class="card-title">Konto löschen</h2></div>
+      <div class="card-body stack">
+        <p class="text-sm text-muted">
+          Löscht das Konto und alle zugehörigen Daten unwiderruflich.
+          Ausgestellte App-Tokens bleiben bestehen — sie gehören der Installation,
+          nicht der Person.
+        </p>
+        {% if ist_selbst %}
+          <p class="hint">Das eigene Konto lässt sich nicht löschen.</p>
+        {% else %}
+          <form method="post" action="/admin/users/{{ bearbeitet.id }}/delete"
+                onsubmit="return confirm('Konto „{{ bearbeitet.display_name }}“ endgültig löschen?')">
+            <button type="submit" class="btn btn-danger">Konto löschen</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

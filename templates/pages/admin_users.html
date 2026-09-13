@@ -1,0 +1,128 @@
+{% extends "layout/app.html" %}
+{% import "components/macros.html" as ui %}
+{% block title %}Benutzer{% endblock %}
+
+{% block main %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">Benutzer</h1>
+  <p class="mt-1 text-sm text-muted">
+    Konten anlegen und verwalten. Nur für Administratoren.
+  </p>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-[22rem_1fr]">
+
+  {# --- Anlegen ---------------------------------------------------------- #}
+  <div class="card h-fit">
+    <div class="card-header"><h2 class="card-title">Benutzer anlegen</h2></div>
+    <form class="card-body stack" method="post" action="/admin/users">
+
+      {% if let Some(message) = error %}
+        <div class="alert alert-danger" role="alert">{{ message }}</div>
+      {% endif %}
+
+      <div class="field">
+        <label class="label" for="display_name">Anzeigename</label>
+        <input class="input" type="text" id="display_name" name="display_name"
+               value="{{ neu_display_name }}" required>
+      </div>
+
+      <div class="field">
+        <label class="label" for="email">E-Mail</label>
+        <input class="input" type="email" id="email" name="email"
+               value="{{ neu_email }}" required>
+      </div>
+
+      <div class="field">
+        <label class="label" for="password">Startpasswort</label>
+        <input class="input" type="password" id="password" name="password"
+               required minlength="{{ min_password_len }}" autocomplete="new-password">
+        <p class="hint">
+          Mindestens {{ min_password_len }} Zeichen. Der Benutzer kann es unter
+          „Mein Konto" selbst ändern.
+        </p>
+      </div>
+
+      <div class="field">
+        <label class="label" for="role">Rolle</label>
+        <select class="select" id="role" name="role">
+          {% for role in roles %}
+            <option value="{{ role }}" {% if role.as_str() == "user" %}selected{% endif %}>{{ role.label() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">Anlegen</button>
+    </form>
+  </div>
+
+  {# --- Liste ------------------------------------------------------------ #}
+  <div class="min-w-0">
+
+    {#
+      Einfaches GET-Formular: Der Suchbegriff landet in der Adresszeile und
+      laesst sich damit als Lesezeichen speichern und weitergeben.
+    #}
+    <form method="get" action="/admin/users" class="mb-4 flex gap-2">
+      <input class="input" type="search" name="q" value="{{ suche }}"
+             placeholder="Name oder E-Mail suchen" aria-label="Benutzer suchen">
+      <button type="submit" class="btn btn-secondary shrink-0">Suchen</button>
+      {% if !suche.is_empty() %}
+        <a href="/admin/users" class="btn btn-ghost shrink-0">Zurücksetzen</a>
+      {% endif %}
+    </form>
+
+    {% if !suche.is_empty() %}
+      <p class="mb-3 text-sm text-muted">
+        {{ users.len() }} von {{ gesamt }} Konten passen zu „{{ suche }}“.
+      </p>
+    {% endif %}
+
+    {% if users.is_empty() %}
+      <div class="empty">
+        <p class="empty-title">Kein Treffer</p>
+        <p class="empty-hint">Für „{{ suche }}“ gibt es kein Konto.</p>
+      </div>
+    {% else %}
+    <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Name</th><th>E-Mail</th><th>Rolle</th><th>Status</th><th>Angelegt</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td class="font-medium">
+            {{ u.display_name }}
+            {% if u.id == current_user_id %}
+              <span class="badge badge-neutral ml-1">du</span>
+            {% endif %}
+          </td>
+          <td class="text-muted">{{ u.email }}</td>
+          <td>
+            {% if u.role.as_str() == "admin" %}
+              <span class="badge badge-brand">{{ u.role.label() }}</span>
+            {% else %}
+              <span class="badge badge-neutral">{{ u.role.label() }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.is_active %}
+              <span class="badge badge-success">aktiv</span>
+            {% else %}
+              <span class="badge badge-danger">gesperrt</span>
+            {% endif %}
+          </td>
+          <td class="text-muted">{% call ui::zeit_kurz(u.created_at) %}{% endcall %}</td>
+          <td class="text-right">
+            <a href="/admin/users/{{ u.id }}" class="btn btn-ghost btn-sm">Bearbeiten</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

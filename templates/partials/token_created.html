@@ -1,0 +1,40 @@
+{#
+  Wird genau einmal angezeigt: direkt nach dem Erstellen. Danach existiert
+  nur noch der Hash in der Datenbank — der Klartext ist unwiederbringlich weg.
+#}
+<div class="alert alert-success mb-6 flex-col items-stretch gap-3">
+  <div>
+    <p class="font-medium">Token „{{ name }}“ erstellt</p>
+    <p class="mt-1 text-xs opacity-90">
+      Jetzt kopieren — es wird nie wieder angezeigt.
+    </p>
+  </div>
+
+  <div class="row gap-2">
+    <input class="input font-mono text-xs" id="token-value" value="{{ plaintext }}" readonly
+           onfocus="this.select()">
+    <button type="button" class="btn btn-secondary shrink-0"
+            onclick="navigator.clipboard.writeText(document.getElementById('token-value').value);
+                     this.textContent='Kopiert';">
+      Kopieren
+    </button>
+  </div>
+</div>
+
+{# Die Tabellenzeile nebenbei in die Liste einhaengen. #}
+{% import "components/macros.html" as ui %}
+<template id="new-row">{% call ui::token_row(token) %}{% endcall %}</template>
+<script>
+  (() => {
+    // Die neue Zeile nebenbei oben in die Tabelle haengen.
+    const row = document.getElementById("new-row");
+    const body = document.querySelector(".table tbody");
+    if (row && body) body.prepend(row.content.cloneNode(true));
+
+    // Der Klartext ist nur dieses eine Mal zu sehen. Wenn die Seite gescrollt
+    // war, liegt der Kasten sonst ausserhalb des Sichtbereichs — dann geht das
+    // Token verloren, ohne dass es jemand merkt.
+    const kasten = document.getElementById("new-token");
+    if (kasten) kasten.scrollIntoView({ behavior: "smooth", block: "center" });
+  })();
+</script>

@@ -1,0 +1,4 @@
+{# Antwort auf POST /notes — genau EIN Eintrag, wird oben in die Liste geschoben. #}
+{% import "components/macros.html" as ui %}
+{% call ui::note_item(note) %}{% endcall %}
+{% include "partials/toast_oob.html" %}

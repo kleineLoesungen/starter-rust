@@ -1,0 +1,91 @@
+{#
+  Grundgeruest jeder Seite. Enthaelt bewusst KEINE Navigation — die kommt in
+  layout/app.html dazu. Anmelde- und Fehlerseiten erben direkt von hier.
+#}
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ layout.title }}{% endblock %} · {{ layout.app_name }}</title>
+
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+
+  {#
+    Vor dem ersten Zeichnen die gespeicherte Farbwahl setzen, damit es beim
+    Laden nicht kurz hell aufblitzt. Bewusst nicht "defer".
+  #}
+  <script>
+    (() => {
+      try {
+        const saved = localStorage.getItem("theme");
+        if (saved === "dark" || saved === "light") {
+          document.documentElement.dataset.theme = saved;
+        }
+      } catch (_) { /* localStorage kann gesperrt sein — dann Systemwahl */ }
+    })();
+  </script>
+
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+
+<body class="min-h-dvh bg-surface text-content antialiased">
+  {% block body %}{% endblock %}
+
+  {#
+    Zielbereich fuer Meldungen. Der Server schickt Toasts als
+    Out-of-Band-Fragment hierher — siehe docs/RECIPES.md.
+  #}
+  <div id="toasts" class="toast-region" role="status" aria-live="polite"></div>
+
+  <script>
+    // --- Zeitstempel in die Ortszeit des Betrachters umrechnen -------------
+    // Der Server liefert UTC. Welche Zeitzone der Mensch vor dem Bildschirm
+    // hat, weiss nur sein Browser — also rechnet der es aus. Damit stimmt
+    // auch die Sommerzeit, ohne dass der Server sie kennen muss.
+    const zeitenFormatieren = (wurzel) => {
+      const lang = new Intl.DateTimeFormat("de-DE", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      });
+      const kurz = new Intl.DateTimeFormat("de-DE", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+      });
+      const genau = new Intl.DateTimeFormat("de-DE", {
+        dateStyle: "full", timeStyle: "long",
+      });
+
+      wurzel.querySelectorAll("time[data-zeit]").forEach((el) => {
+        const wert = el.getAttribute("datetime");
+        if (!wert) return;
+        const d = new Date(wert);
+        if (isNaN(d.getTime())) return;
+        el.textContent = (el.dataset.zeit === "kurz" ? kurz : lang).format(d);
+        el.title = genau.format(d);
+      });
+    };
+
+    zeitenFormatieren(document);
+
+    // Von htmx nachgeladene Ausschnitte bringen eigene Zeitstempel mit.
+    document.body.addEventListener("htmx:afterSettle", (e) => {
+      zeitenFormatieren(e.target instanceof Element ? e.target : document);
+    });
+
+    // Meldungen nach vier Sekunden selbst entfernen.
+    new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node.nodeType !== 1 || !node.matches("[data-autohide]")) continue;
+          setTimeout(() => {
+            node.style.transition = "opacity 200ms";
+            node.style.opacity = "0";
+            setTimeout(() => node.remove(), 200);
+          }, 4000);
+        }
+      }
+    }).observe(document.getElementById("toasts"), { childList: true });
+  </script>
+</body>
+</html>

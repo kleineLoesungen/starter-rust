@@ -1,0 +1,78 @@
+{% extends "layout/app.html" %}
+{% block title %}Mein Konto{% endblock %}
+
+{% block main %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">Mein Konto</h1>
+  <p class="mt-1 text-sm text-muted">
+    Angemeldet als <span class="badge badge-brand">{{ user.role.label() }}</span>
+  </p>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-2">
+
+  {# --- Profil ----------------------------------------------------------- #}
+  <div class="card h-fit">
+    <div class="card-header"><h2 class="card-title">Profil</h2></div>
+    <form class="card-body stack" method="post" action="/account">
+
+      {% if gespeichert == Some("profil") %}
+        <div class="alert alert-success" role="status">Profil gespeichert.</div>
+      {% endif %}
+      {% if let Some(message) = profil_error %}
+        <div class="alert alert-danger" role="alert">{{ message }}</div>
+      {% endif %}
+
+      <div class="field">
+        <label class="label" for="display_name">Anzeigename</label>
+        <input class="input" type="text" id="display_name" name="display_name"
+               value="{{ user.display_name }}" required autocomplete="name">
+      </div>
+
+      <div class="field">
+        <label class="label" for="email">E-Mail</label>
+        <input class="input" type="email" id="email" name="email"
+               value="{{ user.email }}" required autocomplete="email">
+        <p class="hint">Wird auch zum Anmelden benutzt.</p>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Speichern</button>
+    </form>
+  </div>
+
+  {# --- Passwort ---------------------------------------------------------- #}
+  <div class="card h-fit">
+    <div class="card-header"><h2 class="card-title">Passwort ändern</h2></div>
+    <form class="card-body stack" method="post" action="/account/password">
+
+      {% if gespeichert == Some("passwort") %}
+        <div class="alert alert-success" role="status">Passwort geändert.</div>
+      {% endif %}
+      {% if let Some(message) = passwort_error %}
+        <div class="alert alert-danger" role="alert">{{ message }}</div>
+      {% endif %}
+
+      <div class="field">
+        <label class="label" for="current_password">Aktuelles Passwort</label>
+        <input class="input" type="password" id="current_password" name="current_password"
+               required autocomplete="current-password">
+      </div>
+
+      <div class="field">
+        <label class="label" for="new_password">Neues Passwort</label>
+        <input class="input" type="password" id="new_password" name="new_password"
+               required minlength="{{ min_password_len }}" autocomplete="new-password">
+        <p class="hint">Mindestens {{ min_password_len }} Zeichen.</p>
+      </div>
+
+      <div class="field">
+        <label class="label" for="new_password_repeat">Neues Passwort wiederholen</label>
+        <input class="input" type="password" id="new_password_repeat" name="new_password_repeat"
+               required minlength="{{ min_password_len }}" autocomplete="new-password">
+      </div>
+
+      <button type="submit" class="btn btn-primary">Passwort ändern</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

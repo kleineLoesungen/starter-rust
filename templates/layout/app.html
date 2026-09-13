@@ -1,0 +1,199 @@
+{#
+  Layout fuer den angemeldeten Bereich.
+
+  Zwei Bildschirmgroessen, eine Quelle:
+
+  * Ab `md` steht die Navigation waagerecht in der Kopfzeile.
+  * Darunter sitzt sie als Leiste UNTEN — dort sind beim Halten des Geraets
+    die Daumen. Was nicht in die Leiste passt, steckt hinter „Mehr".
+
+  Die Eintraege stehen nur EINMAL im Markup: Das Makro `nav_links` wird zweimal
+  aufgerufen, fuer die Kopfzeile und fuer das Menue. Ein neuer Menuepunkt gehoert
+  ins Makro — dann erscheint er auf beiden Groessen. Die untere Leiste zeigt
+  bewusst nur eine Auswahl als Abkuerzung.
+#}
+{% extends "layout/base.html" %}
+
+{% macro nav_links(layout, klasse) %}
+  <a href="/dashboard" class="{{ klasse }} {% if layout.is_active("/dashboard") %}nav-link-active{% endif %}">Übersicht</a>
+  <a href="/notes" class="{{ klasse }} {% if layout.is_active("/notes") %}nav-link-active{% endif %}">Notizen</a>
+  {% if layout.is_moderator() %}
+    <a href="/moderation" class="{{ klasse }} {% if layout.is_active("/moderation") %}nav-link-active{% endif %}">Moderation</a>
+  {% endif %}
+  {% if layout.is_admin() %}
+    <a href="/admin/users" class="{{ klasse }} {% if layout.is_active("/admin/users") %}nav-link-active{% endif %}">Benutzer</a>
+    <a href="/admin/tokens" class="{{ klasse }} {% if layout.is_active("/admin/tokens") %}nav-link-active{% endif %}">Tokens</a>
+  {% endif %}
+{% endmacro %}
+
+{% block body %}
+<div class="flex min-h-dvh flex-col">
+
+  <header class="sticky top-0 z-30 border-b border-border bg-surface-raised/85 backdrop-blur">
+    <div class="container-app flex h-14 items-center gap-2">
+
+      <a href="/dashboard" class="row mr-2 shrink-0 font-semibold tracking-tight">
+        <span class="grid size-7 place-items-center rounded-ui bg-brand text-brand-content text-xs font-bold">
+          {{ layout.app_initial() }}
+        </span>
+        <span>{{ layout.app_name }}</span>
+      </a>
+
+      {# Breite Bildschirme: Navigation direkt in der Kopfzeile. #}
+      <nav class="hidden items-center gap-1 md:flex" aria-label="Hauptnavigation">
+        {% call nav_links(layout, "nav-link") %}{% endcall %}
+      </nav>
+
+      <div class="ml-auto flex items-center gap-1">
+        <button type="button" class="btn btn-ghost btn-icon" data-theme-toggle
+                aria-label="Hell/Dunkel umschalten" title="Hell/Dunkel umschalten">
+          <span aria-hidden="true">◐</span>
+        </button>
+
+        {% if let Some(user) = layout.user %}
+          <div class="ml-1 hidden items-center gap-2 md:flex">
+            <a href="/account"
+               class="grid size-8 place-items-center rounded-full bg-brand-subtle text-xs font-semibold text-brand transition-opacity hover:opacity-80"
+               title="Mein Konto — {{ user.display_name }} ({{ user.role.label() }})">
+              {{ user.initials() }}
+            </a>
+            <form method="post" action="/logout">
+              <button type="submit" class="btn btn-ghost btn-sm">Abmelden</button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  {# `pb-24` haelt den Inhalt oberhalb der unteren Leiste. #}
+  <main class="container-app flex-1 pt-8 pb-24 md:pb-8">
+    {% block main %}{% endblock %}
+  </main>
+
+  <footer class="border-t border-border py-6 pb-24 md:pb-6">
+    <div class="container-app flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-subtle">
+      <span>{{ layout.app_name }}</span>
+      <a href="/styleguide" class="hover:text-content">Styleguide</a>
+      <a href="/api/v1/health" class="hover:text-content">API-Status</a>
+    </div>
+  </footer>
+</div>
+
+{# --- Untere Leiste, nur auf schmalen Bildschirmen ------------------------ #}
+<nav class="tabbar md:hidden" aria-label="Hauptnavigation">
+  <a href="/dashboard" class="tab {% if layout.is_active("/dashboard") %}tab-active{% endif %}">
+    <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>
+    </svg>
+    Übersicht
+  </a>
+
+  <a href="/notes" class="tab {% if layout.is_active("/notes") %}tab-active{% endif %}">
+    <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M10 13h6M10 17h4"/>
+    </svg>
+    Notizen
+  </a>
+
+  {% if layout.is_admin() %}
+    <a href="/admin/users" class="tab {% if layout.is_active("/admin/users") %}tab-active{% endif %}">
+      <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="8" r="3.2"/><path d="M5.5 20v-1a6.5 6.5 0 0 1 13 0v1"/>
+      </svg>
+      Benutzer
+    </a>
+  {% endif %}
+
+  <button type="button" class="tab" data-menu-toggle
+          aria-expanded="false" aria-controls="hauptmenue" aria-label="Mehr anzeigen">
+    <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <path d="M5 12h.01M12 12h.01M19 12h.01"/>
+    </svg>
+    Mehr
+  </button>
+</nav>
+
+{#
+  Das Menue. Auf- und zugeklappt wird ueber die Tailwind-Klasse `hidden`, nicht
+  ueber eigene CSS-Regeln: Utilities stehen in der obersten Kaskadenebene und
+  gewinnen damit zuverlaessig gegen alles andere.
+#}
+<div id="hauptmenue" class="hidden md:hidden">
+  <div class="sheet-hintergrund" data-menue-hintergrund></div>
+
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Menü">
+    <div class="mx-auto mt-2 h-1 w-10 rounded-full bg-border-strong" aria-hidden="true"></div>
+
+    <nav class="container-app flex max-h-[70dvh] flex-col gap-1 overflow-y-auto py-3">
+      {% call nav_links(layout, "nav-link-mobile") %}{% endcall %}
+
+      {% if let Some(user) = layout.user %}
+        <div class="my-2 border-t border-border"></div>
+
+        <a href="/account" class="nav-link-mobile {% if layout.is_active("/account") %}nav-link-active{% endif %}">
+          Mein Konto
+          <span class="mt-0.5 block text-xs font-normal text-subtle">
+            {{ user.display_name }} · {{ user.role.label() }}
+          </span>
+        </a>
+
+        <form method="post" action="/logout">
+          <button type="submit" class="nav-link-mobile w-full text-left">Abmelden</button>
+        </form>
+      {% endif %}
+    </nav>
+  </div>
+</div>
+
+<script>
+  // --- Farbwahl umschalten und merken -------------------------------------
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-theme-toggle]")) return;
+    const root = document.documentElement;
+    const dark = root.dataset.theme
+      ? root.dataset.theme === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("theme", root.dataset.theme); } catch (_) {}
+  });
+
+  // --- Menü der unteren Leiste --------------------------------------------
+  (() => {
+    const knopf = document.querySelector("[data-menu-toggle]");
+    const menue = document.getElementById("hauptmenue");
+    if (!knopf || !menue) return;
+
+    const istOffen = () => !menue.classList.contains("hidden");
+
+    const setzen = (offen) => {
+      menue.classList.toggle("hidden", !offen);
+      knopf.setAttribute("aria-expanded", String(offen));
+      knopf.setAttribute("aria-label", offen ? "Menü schließen" : "Mehr anzeigen");
+      // Hintergrund nicht mitscrollen lassen, solange das Menü offen ist.
+      document.body.style.overflow = offen ? "hidden" : "";
+    };
+
+    knopf.addEventListener("click", () => setzen(!istOffen()));
+
+    // Tipp auf den abgedunkelten Hintergrund schließt.
+    menue.querySelector("[data-menue-hintergrund]").addEventListener("click", () => setzen(false));
+
+    // Mit Escape schließen — erwartetes Verhalten für ein offenes Menü.
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") setzen(false);
+    });
+
+    // Wird das Fenster breit, übernimmt die Kopfzeile wieder. Das Menü muss
+    // dann zu sein, sonst steht es beim Zurückdrehen unerwartet offen — und
+    // `overflow: hidden` bliebe am Body kleben.
+    window.matchMedia("(min-width: 48rem)").addEventListener("change", (e) => {
+      if (e.matches) setzen(false);
+    });
+  })();
+</script>
+{% endblock %}

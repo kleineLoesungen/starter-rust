@@ -1,0 +1,209 @@
+{#
+  Lebende Design-Dokumentation. Zeigt jede Komponente im echten Zustand.
+  Wenn eine Aenderung in theme.css hier gut aussieht, sieht sie ueberall gut aus.
+#}
+{% extends "layout/app.html" %}
+{% block title %}Styleguide{% endblock %}
+
+{% block main %}
+<div class="mb-8">
+  <h1 class="text-2xl font-semibold tracking-tight">Styleguide</h1>
+  <p class="mt-1 max-w-2xl text-sm text-muted">
+    Alle Bausteine der Oberfläche an einem Ort. Definiert in
+    <code class="code">assets/css/components.css</code>, eingefärbt über
+    <code class="code">assets/css/theme.css</code>.
+  </p>
+</div>
+
+{# ---------- Live-Regler ---------------------------------------------- #}
+<section class="card mb-10">
+  <div class="card-header">
+    <h2 class="card-title">Erscheinungsbild ausprobieren</h2>
+    <button type="button" class="btn btn-ghost btn-sm" data-reset-theme>Zurücksetzen</button>
+  </div>
+  <div class="card-body grid gap-5 sm:grid-cols-3">
+    <div class="field">
+      <label class="label" for="hue">Farbton <span class="text-subtle" data-out="hue"></span></label>
+      <input type="range" id="hue" min="0" max="360" step="1" data-token="--brand-hue">
+      <p class="hint">25 rot · 145 grün · 258 indigo · 320 pink</p>
+    </div>
+    <div class="field">
+      <label class="label" for="chroma">Farbkraft <span class="text-subtle" data-out="chroma"></span></label>
+      <input type="range" id="chroma" min="0" max="0.24" step="0.01" data-token="--brand-chroma">
+      <p class="hint">0 = grau, 0.20 = kräftig</p>
+    </div>
+    <div class="field">
+      <label class="label" for="radius">Rundung <span class="text-subtle" data-out="radius"></span></label>
+      <input type="range" id="radius" min="0" max="1.5" step="0.125" data-token="--ui-radius" data-unit="rem">
+      <p class="hint">0 = kantig, 1.5rem = Pillen</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <p class="text-xs text-muted">
+      Die Änderung gilt nur in diesem Tab. Gefällt sie, trage die Werte in
+      <code class="code">assets/css/theme.css</code> ein — dann gelten sie überall.
+    </p>
+  </div>
+</section>
+
+{# ---------- Farbrollen ------------------------------------------------- #}
+<section class="mb-10">
+  <h2 class="mb-1 text-lg font-semibold">Farbrollen</h2>
+  <p class="mb-4 text-sm text-muted">
+    Immer diese Rollen benutzen, nie <code class="code">bg-blue-500</code>.
+    Nur so stimmt der Dunkelmodus von allein.
+  </p>
+  <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+    {% for swatch in swatches %}
+      <div class="rounded-ui border border-border overflow-hidden">
+        <div class="h-14 {{ swatch.class }}"></div>
+        <div class="px-3 py-2">
+          <p class="font-mono text-xs text-content">{{ swatch.class }}</p>
+          <p class="text-xs text-subtle">{{ swatch.role }}</p>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+
+{# ---------- Knoepfe ---------------------------------------------------- #}
+<section class="mb-10">
+  <h2 class="mb-4 text-lg font-semibold">Knöpfe</h2>
+  <div class="card"><div class="card-body stack">
+    <div class="flex flex-wrap gap-3">
+      <button class="btn btn-primary">Primär</button>
+      <button class="btn btn-secondary">Sekundär</button>
+      <button class="btn btn-ghost">Unauffällig</button>
+      <button class="btn btn-danger">Gefährlich</button>
+      <button class="btn btn-primary" disabled>Gesperrt</button>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <button class="btn btn-primary btn-sm">Klein</button>
+      <button class="btn btn-primary">Normal</button>
+      <button class="btn btn-primary btn-lg">Groß</button>
+      <button class="btn btn-secondary btn-icon" aria-label="Mehr">⋯</button>
+    </div>
+    <div>
+      <button class="btn btn-primary htmx-request">
+        <span class="spinner"></span> Lädt gerade
+      </button>
+    </div>
+  </div></div>
+</section>
+
+{# ---------- Formulare -------------------------------------------------- #}
+<section class="mb-10">
+  <h2 class="mb-4 text-lg font-semibold">Formulare</h2>
+  <div class="card"><div class="card-body grid gap-5 sm:grid-cols-2">
+    <div class="field">
+      <label class="label" for="sg-text">Textfeld</label>
+      <input class="input" id="sg-text" type="text" placeholder="Platzhalter">
+      <p class="hint">Ein erklärender Hinweis.</p>
+    </div>
+    <div class="field">
+      <label class="label" for="sg-err">Feld mit Fehler</label>
+      <input class="input input-error" id="sg-err" type="text" value="ungültig">
+      <p class="error">Diese Eingabe ist nicht gültig.</p>
+    </div>
+    <div class="field">
+      <label class="label" for="sg-select">Auswahl</label>
+      <select class="select" id="sg-select"><option>Erste</option><option>Zweite</option></select>
+    </div>
+    <div class="field">
+      <label class="label" for="sg-area">Mehrzeilig</label>
+      <textarea class="textarea" id="sg-area" placeholder="Text …"></textarea>
+    </div>
+    <label class="row gap-2 text-sm">
+      <input type="checkbox" class="checkbox" checked> Ankreuzfeld
+    </label>
+  </div></div>
+</section>
+
+{# ---------- Abzeichen und Hinweise ------------------------------------- #}
+<section class="mb-10">
+  <h2 class="mb-4 text-lg font-semibold">Abzeichen und Hinweise</h2>
+  <div class="card"><div class="card-body stack">
+    <div class="flex flex-wrap gap-2">
+      <span class="badge badge-neutral">neutral</span>
+      <span class="badge badge-brand">Marke</span>
+      <span class="badge badge-success">erfolgreich</span>
+      <span class="badge badge-warning">Warnung</span>
+      <span class="badge badge-danger">Fehler</span>
+    </div>
+    <div class="alert alert-info">Ein neutraler Hinweis.</div>
+    <div class="alert alert-success">Das hat geklappt.</div>
+    <div class="alert alert-warning">Das solltest du prüfen.</div>
+    <div class="alert alert-danger">Das ist schiefgegangen.</div>
+  </div></div>
+</section>
+
+{# ---------- Tabelle und Leerzustand ------------------------------------ #}
+<section class="mb-10">
+  <h2 class="mb-4 text-lg font-semibold">Tabelle</h2>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Name</th><th>Rolle</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Anna Beispiel</td><td>Administrator</td><td><span class="badge badge-success">aktiv</span></td></tr>
+        <tr><td>Bernd Muster</td><td>Moderator</td><td><span class="badge badge-success">aktiv</span></td></tr>
+        <tr><td>Clara Test</td><td>Benutzer</td><td><span class="badge badge-danger">gesperrt</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="mb-10">
+  <h2 class="mb-4 text-lg font-semibold">Leerzustand</h2>
+  <div class="empty">
+    <p class="empty-title">Hier ist noch nichts</p>
+    <p class="empty-hint">Ein Leerzustand erklärt, was als Nächstes zu tun ist.</p>
+    <button class="btn btn-primary btn-sm">Ersten Eintrag anlegen</button>
+  </div>
+</section>
+
+{# ---------- Meldungen -------------------------------------------------- #}
+<section class="mb-10">
+  <h2 class="mb-4 text-lg font-semibold">Meldungen</h2>
+  <div class="card"><div class="card-body">
+    <button class="btn btn-secondary" data-demo-toast>Meldung einblenden</button>
+  </div></div>
+</section>
+
+<script>
+  // --- Live-Regler --------------------------------------------------------
+  const root = document.documentElement;
+  const style = getComputedStyle(root);
+
+  document.querySelectorAll("[data-token]").forEach((input) => {
+    const token = input.dataset.token;
+    const unit = input.dataset.unit || "";
+    const current = style.getPropertyValue(token).trim();
+    input.value = parseFloat(current) || 0;
+
+    const show = () => {
+      const out = document.querySelector(`[data-out="${input.id}"]`);
+      if (out) out.textContent = input.value + unit;
+    };
+    show();
+
+    input.addEventListener("input", () => {
+      root.style.setProperty(token, input.value + unit);
+      show();
+    });
+  });
+
+  document.querySelector("[data-reset-theme]")?.addEventListener("click", () => {
+    ["--brand-hue", "--brand-chroma", "--ui-radius"].forEach((t) => root.style.removeProperty(t));
+    location.reload();
+  });
+
+  // --- Beispielmeldung ----------------------------------------------------
+  document.querySelector("[data-demo-toast]")?.addEventListener("click", () => {
+    const el = document.createElement("div");
+    el.className = "toast toast-success";
+    el.setAttribute("data-autohide", "");
+    el.textContent = "Gespeichert.";
+    document.getElementById("toasts").append(el);
+  });
+</script>
+{% endblock %}

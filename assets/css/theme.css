@@ -1,0 +1,203 @@
+/* ==========================================================================
+   DESIGN-TOKENS
+   --------------------------------------------------------------------------
+   Das ist die Datei fuer das Erscheinungsbild. Wer das Aussehen der
+   Anwendung aendern will, aendert hier — und nirgends sonst — Werte.
+
+   Aufbau in drei Stufen:
+     1. Grundlagen  — Farbton, Rundung, Schrift, Dichte  (das anfassen!)
+     2. Semantik    — daraus abgeleitete Rollen wie "surface" oder "danger"
+     3. Bruecke     — meldet die Rollen als Tailwind-Utilities an
+
+   Farben sind in OKLCH angegeben. Der Vorteil gegenueber Hex: Der erste Wert
+   ist die wahrgenommene Helligkeit. Zwei Farben mit gleicher Zahl wirken
+   gleich hell — Kontraste bleiben deshalb erhalten, wenn man den Farbton dreht.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. GRUNDLAGEN
+   -------------------------------------------------------------------------- */
+:root {
+  /* Markenfarbe. EINE Zahl faerbt die gesamte Anwendung um.
+     Anhaltspunkte: 25 rot · 70 orange · 145 gruen · 195 tuerkis
+                    258 indigo · 300 violett · 350 pink */
+  --brand-hue: 258;
+
+  /* Farbkraft. 0 = Graustufen, 0.10 = zurueckhaltend, 0.20 = sehr kraeftig. */
+  --brand-chroma: 0.15;
+
+  /* Eckenrundung aller Bedienelemente. 0 = kantig, 0.5rem = weich, 1.5rem = Pillen. */
+  --ui-radius: 0.625rem;
+
+  /* Schriften. */
+  --ui-font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ui-font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+
+  /* Dichte der Oberflaeche: Hoehe von Knoepfen und Eingabefeldern. */
+  --ui-control-height: 2.5rem;
+
+  /* Maximale Breite des Inhaltsbereichs. */
+  --ui-content-width: 72rem;
+}
+
+/* --------------------------------------------------------------------------
+   2. SEMANTIK — helles Erscheinungsbild
+   --------------------------------------------------------------------------
+   Immer diese Rollen benutzen, nie rohe Farbwerte. Nur so bleibt der
+   Dunkelmodus automatisch korrekt.
+   -------------------------------------------------------------------------- */
+:root {
+  /* Flaechen, von hinten nach vorn */
+  --ui-surface:        oklch(0.985 0.003 var(--brand-hue));
+  --ui-surface-raised: oklch(1 0 0);
+  --ui-surface-sunken: oklch(0.955 0.005 var(--brand-hue));
+
+  /* Linien */
+  --ui-border:        oklch(0.905 0.008 var(--brand-hue));
+  --ui-border-strong: oklch(0.82 0.012 var(--brand-hue));
+
+  /* Text */
+  --ui-content:        oklch(0.24 0.02 var(--brand-hue));
+  --ui-content-muted:  oklch(0.53 0.018 var(--brand-hue));
+  --ui-content-subtle: oklch(0.66 0.014 var(--brand-hue));
+
+  /* Marke */
+  --ui-brand:         oklch(0.55 var(--brand-chroma) var(--brand-hue));
+  --ui-brand-hover:   oklch(0.48 var(--brand-chroma) var(--brand-hue));
+  --ui-brand-content: oklch(0.99 0.01 var(--brand-hue));
+  --ui-brand-subtle:  oklch(0.95 calc(var(--brand-chroma) * 0.25) var(--brand-hue));
+
+  /* Zustaende. Fester Farbton, damit Gruen gruen bleibt, egal welche Marke. */
+  --ui-success:        oklch(0.58 0.13 150);
+  --ui-success-subtle: oklch(0.95 0.04 150);
+  --ui-warning:        oklch(0.62 0.13 75);
+  --ui-warning-subtle: oklch(0.96 0.05 75);
+  --ui-danger:         oklch(0.55 0.18 25);
+  --ui-danger-subtle:  oklch(0.95 0.04 25);
+
+  /* Fokusring — Barrierefreiheit, nicht abschalten. */
+  --ui-focus: oklch(0.55 0.17 var(--brand-hue));
+
+  /* Schatten */
+  --ui-shadow-sm: 0 1px 2px 0 oklch(0.2 0.02 var(--brand-hue) / 0.06);
+  --ui-shadow-md: 0 4px 12px -2px oklch(0.2 0.02 var(--brand-hue) / 0.10);
+  --ui-shadow-lg: 0 12px 32px -8px oklch(0.2 0.02 var(--brand-hue) / 0.18);
+}
+
+/* --------------------------------------------------------------------------
+   Dunkles Erscheinungsbild
+   --------------------------------------------------------------------------
+   Zwei Ausloeser: die Systemeinstellung, oder data-theme="dark" am <html>.
+   Die Systemvariante greift nicht, wenn ausdruecklich "light" gewaehlt wurde.
+   -------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ui-surface:        oklch(0.18 0.012 var(--brand-hue));
+    --ui-surface-raised: oklch(0.225 0.014 var(--brand-hue));
+    --ui-surface-sunken: oklch(0.14 0.010 var(--brand-hue));
+
+    --ui-border:        oklch(0.32 0.016 var(--brand-hue));
+    --ui-border-strong: oklch(0.44 0.020 var(--brand-hue));
+
+    --ui-content:        oklch(0.95 0.008 var(--brand-hue));
+    --ui-content-muted:  oklch(0.72 0.016 var(--brand-hue));
+    --ui-content-subtle: oklch(0.58 0.016 var(--brand-hue));
+
+    /* Im Dunkeln heller und weniger kraeftig — sonst flimmert die Farbe. */
+    --ui-brand:         oklch(0.68 calc(var(--brand-chroma) * 0.85) var(--brand-hue));
+    --ui-brand-hover:   oklch(0.75 calc(var(--brand-chroma) * 0.85) var(--brand-hue));
+    --ui-brand-content: oklch(0.17 0.02 var(--brand-hue));
+    --ui-brand-subtle:  oklch(0.30 calc(var(--brand-chroma) * 0.35) var(--brand-hue));
+
+    --ui-success:        oklch(0.72 0.14 150);
+    --ui-success-subtle: oklch(0.28 0.05 150);
+    --ui-warning:        oklch(0.78 0.13 75);
+    --ui-warning-subtle: oklch(0.30 0.05 75);
+    --ui-danger:         oklch(0.68 0.17 25);
+    --ui-danger-subtle:  oklch(0.28 0.06 25);
+
+    --ui-focus: oklch(0.70 0.16 var(--brand-hue));
+
+    --ui-shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.30);
+    --ui-shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.42);
+    --ui-shadow-lg: 0 12px 32px -8px oklch(0 0 0 / 0.55);
+  }
+}
+
+/* Ausdrueckliche Wahl per Umschalter schlaegt die Systemeinstellung. */
+:root[data-theme="dark"] {
+  --ui-surface:        oklch(0.18 0.012 var(--brand-hue));
+  --ui-surface-raised: oklch(0.225 0.014 var(--brand-hue));
+  --ui-surface-sunken: oklch(0.14 0.010 var(--brand-hue));
+
+  --ui-border:        oklch(0.32 0.016 var(--brand-hue));
+  --ui-border-strong: oklch(0.44 0.020 var(--brand-hue));
+
+  --ui-content:        oklch(0.95 0.008 var(--brand-hue));
+  --ui-content-muted:  oklch(0.72 0.016 var(--brand-hue));
+  --ui-content-subtle: oklch(0.58 0.016 var(--brand-hue));
+
+  --ui-brand:         oklch(0.68 calc(var(--brand-chroma) * 0.85) var(--brand-hue));
+  --ui-brand-hover:   oklch(0.75 calc(var(--brand-chroma) * 0.85) var(--brand-hue));
+  --ui-brand-content: oklch(0.17 0.02 var(--brand-hue));
+  --ui-brand-subtle:  oklch(0.30 calc(var(--brand-chroma) * 0.35) var(--brand-hue));
+
+  --ui-success:        oklch(0.72 0.14 150);
+  --ui-success-subtle: oklch(0.28 0.05 150);
+  --ui-warning:        oklch(0.78 0.13 75);
+  --ui-warning-subtle: oklch(0.30 0.05 75);
+  --ui-danger:         oklch(0.68 0.17 25);
+  --ui-danger-subtle:  oklch(0.28 0.06 25);
+
+  --ui-focus: oklch(0.70 0.16 var(--brand-hue));
+
+  --ui-shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.30);
+  --ui-shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.42);
+  --ui-shadow-lg: 0 12px 32px -8px oklch(0 0 0 / 0.55);
+}
+
+/* --------------------------------------------------------------------------
+   3. BRUECKE ZU TAILWIND
+   --------------------------------------------------------------------------
+   Meldet die Rollen als Utilities an: bg-surface, text-content,
+   border-border, ring-focus, rounded-ui, shadow-md ...
+
+   Das "inline" ist entscheidend: Es sorgt dafuer, dass die erzeugten Klassen
+   auf var(--ui-...) zeigen statt auf den aufgeloesten Wert. Nur so wirkt der
+   Dunkelmodus zur Laufzeit.
+   -------------------------------------------------------------------------- */
+@theme inline {
+  --color-surface:        var(--ui-surface);
+  --color-surface-raised: var(--ui-surface-raised);
+  --color-surface-sunken: var(--ui-surface-sunken);
+
+  --color-border:        var(--ui-border);
+  --color-border-strong: var(--ui-border-strong);
+
+  --color-content:        var(--ui-content);
+  --color-muted:          var(--ui-content-muted);
+  --color-subtle:         var(--ui-content-subtle);
+
+  --color-brand:         var(--ui-brand);
+  --color-brand-hover:   var(--ui-brand-hover);
+  --color-brand-content: var(--ui-brand-content);
+  --color-brand-subtle:  var(--ui-brand-subtle);
+
+  --color-success:        var(--ui-success);
+  --color-success-subtle: var(--ui-success-subtle);
+  --color-warning:        var(--ui-warning);
+  --color-warning-subtle: var(--ui-warning-subtle);
+  --color-danger:         var(--ui-danger);
+  --color-danger-subtle:  var(--ui-danger-subtle);
+
+  --color-focus: var(--ui-focus);
+
+  --radius-ui: var(--ui-radius);
+
+  --font-sans: var(--ui-font-sans);
+  --font-mono: var(--ui-font-mono);
+
+  --shadow-sm: var(--ui-shadow-sm);
+  --shadow-md: var(--ui-shadow-md);
+  --shadow-lg: var(--ui-shadow-lg);
+}

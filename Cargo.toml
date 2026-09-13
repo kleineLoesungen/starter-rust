@@ -1,0 +1,55 @@
+[package]
+name = "starter"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+
+[dependencies]
+# --- Web ---
+axum = { version = "0.8", features = ["macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
+tower = "0.5"
+tower-http = { version = "0.7", features = ["trace", "compression-gzip", "set-header", "catch-panic", "fs"] }
+
+# --- Templates ---
+askama = "0.16"
+
+# --- Datenbank ---
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio", "tls-rustls-ring", "postgres", "uuid", "time", "macros", "migrate",
+] }
+
+# --- Sessions & Auth ---
+tower-sessions = "0.14"
+tower-sessions-sqlx-store = { version = "0.15", features = ["postgres"] }
+argon2 = "0.6"
+sha2 = "0.11"
+base64 = "0.22"
+rand = "0.10"
+
+# --- Serialisierung / Typen ---
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+time = { version = "0.3", features = ["serde", "formatting", "macros"] }
+
+# --- Fehler & Logging ---
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# --- Konfiguration ---
+dotenvy = "0.15"
+subtle = "2"
+axum-extra = { version = "0.12.6", features = ["form"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+tower = { version = "0.5", features = ["util"] }

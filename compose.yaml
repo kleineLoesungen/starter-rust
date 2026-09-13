@@ -1,0 +1,51 @@
+# Zwei Betriebsarten:
+#
+#   just db-up   -> nur Postgres im Container, Anwendung laeuft nativ (schnellste Schleife)
+#   just up      -> alles im Container, so wie in Produktion
+#
+# In Produktion ist die Datenbank extern; dann faellt der `db`-Dienst weg und
+# DATABASE_URL zeigt auf den echten Server.
+
+# Fester Projektname. Ohne diese Zeile leitet Docker ihn vom Ordnernamen ab —
+# beim Umbenennen oder Kopieren des Verzeichnisses waeren die Container und
+# vor allem das Datenbank-Volume ploetzlich andere, und die lokalen Daten
+# scheinbar verschwunden.
+name: starter
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: starter
+      POSTGRES_PASSWORD: starter
+      POSTGRES_DB: starter
+    ports:
+      # 55432 statt 5432, damit eine lokal installierte Postgres nicht kollidiert.
+      - "55432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U starter"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    # Nur mit `--profile app`, damit `just db-up` nicht die ganze Anwendung baut.
+    profiles: ["app"]
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      # Im Container-Netz heisst der Datenbankrechner "db", nicht "localhost".
+      DATABASE_URL: postgres://starter:starter@db:5432/starter
+      BIND_ADDR: 0.0.0.0:3000
+      PUBLIC_URL: http://localhost:3000
+      COOKIE_SECURE: "false"
+      RUST_LOG: starter=info
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:

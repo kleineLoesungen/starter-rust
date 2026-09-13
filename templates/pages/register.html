@@ -1,0 +1,47 @@
+{% extends "layout/base.html" %}
+{% block title %}Konto anlegen{% endblock %}
+
+{% block body %}
+<main class="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-6 px-6 py-12">
+  <div class="text-center">
+    <h1 class="text-xl font-semibold tracking-tight">Ersteinrichtung</h1>
+    <p class="mt-1 text-sm text-muted">
+      Das erste Konto dieser Installation. Es erhält Administratorrechte und
+      legt danach alle weiteren Benutzer an.
+    </p>
+  </div>
+
+  <div class="card">
+    <form class="card-body stack" method="post" action="/register">
+      {% if let Some(message) = error %}
+        <div class="alert alert-danger" role="alert">{{ message }}</div>
+      {% endif %}
+
+      <div class="field">
+        <label class="label" for="display_name">Anzeigename</label>
+        <input class="input" type="text" id="display_name" name="display_name"
+               value="{{ display_name }}" required autocomplete="name" autofocus>
+      </div>
+
+      <div class="field">
+        <label class="label" for="email">E-Mail</label>
+        <input class="input" type="email" id="email" name="email"
+               value="{{ email }}" required autocomplete="email">
+      </div>
+
+      <div class="field">
+        <label class="label" for="password">Passwort</label>
+        <input class="input" type="password" id="password" name="password"
+               required autocomplete="new-password" minlength="{{ min_password_len }}">
+        <p class="hint">Mindestens {{ min_password_len }} Zeichen.</p>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">Konto anlegen</button>
+    </form>
+  </div>
+
+  <p class="text-center text-sm text-muted">
+    Schon eingerichtet? <a href="/login" class="font-medium text-brand hover:underline">Anmelden</a>
+  </p>
+</main>
+{% endblock %}

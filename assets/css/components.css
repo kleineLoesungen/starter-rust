@@ -1,0 +1,287 @@
+/* ==========================================================================
+   KOMPONENTEN
+   --------------------------------------------------------------------------
+   Bewusst CSS-Klassen statt Template-Bausteinen. Im Markup steht dann
+   <button class="btn btn-primary">, und es gibt keine Bausteinschnittstelle,
+   die man kennen muesste. Das Aussehen aller Knoepfe aendert man hier einmal.
+
+   Regel: In diesen Klassen NUR semantische Tokens verwenden
+   (bg-surface, text-content, ...), niemals bg-blue-500 oder aehnliches.
+   ========================================================================== */
+
+@layer base {
+  /* Tailwind v4 setzt Rahmen auf currentColor. Wir wollen die Token-Linie. */
+  *, ::before, ::after { border-color: var(--ui-border); }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: var(--ui-surface);
+    color: var(--ui-content);
+    font-family: var(--ui-font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Ein einheitlicher, gut sichtbarer Fokusring fuer die Tastaturbedienung. */
+  :focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 2px;
+  }
+
+  /* Wer Animationen abgestellt hat, bekommt keine. */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+
+  /* --- Layout ----------------------------------------------------------- */
+
+  .container-app {
+    @apply mx-auto w-full px-4 sm:px-6;
+    max-width: var(--ui-content-width);
+  }
+
+  .stack   { @apply flex flex-col gap-4; }
+  .row     { @apply flex items-center gap-3; }
+
+  /* --- Knopf ------------------------------------------------------------ */
+
+  .btn {
+    @apply inline-flex shrink-0 items-center justify-center gap-2
+           rounded-ui px-4 text-sm font-medium
+           transition-colors duration-150
+           disabled:pointer-events-none disabled:opacity-50;
+    height: var(--ui-control-height);
+  }
+
+  .btn-primary   { @apply bg-brand text-brand-content hover:bg-brand-hover; }
+  .btn-secondary { @apply border border-border bg-surface-raised text-content hover:bg-surface-sunken; }
+  .btn-ghost     { @apply text-muted hover:bg-surface-sunken hover:text-content; }
+  .btn-danger    { @apply bg-danger text-white hover:opacity-90; }
+
+  .btn-sm   { @apply h-8 px-3 text-xs; }
+  .btn-lg   { @apply h-12 px-6 text-base; }
+  .btn-icon { @apply w-10 px-0; }
+  .btn-block { @apply w-full; }
+
+  /* --- Formulare -------------------------------------------------------- */
+
+  .field { @apply flex flex-col gap-1.5; }
+
+  .label { @apply text-sm font-medium text-content; }
+
+  .input, .textarea, .select {
+    @apply w-full rounded-ui border border-border bg-surface-raised
+           px-3 text-sm text-content placeholder:text-subtle
+           transition-colors
+           focus:border-brand focus:outline-none
+           disabled:cursor-not-allowed disabled:opacity-60;
+    height: var(--ui-control-height);
+  }
+
+  .textarea { @apply py-2; height: auto; min-height: 6rem; }
+
+  .hint  { @apply text-xs text-muted; }
+  .error { @apply text-xs font-medium text-danger; }
+
+  /* Feld mit Fehler — wird vom Server zusaetzlich gesetzt. */
+  .input-error { @apply border-danger focus:border-danger; }
+
+  .checkbox {
+    @apply size-4 rounded border-border-strong accent-[var(--ui-brand)];
+  }
+
+  /* --- Karte ------------------------------------------------------------ */
+
+  /*
+    `min-w-0` ist hier kein Schoenheitsfehler, sondern wichtig: Ein Grid- oder
+    Flex-Element hat standardmaessig `min-width: auto` und schrumpft damit nie
+    unter die Mindestbreite seines Inhalts. Steckt in einer Karte etwas Breites
+    (ein langer Befehl im Codeblock, eine breite Tabelle), sprengt sie sonst auf
+    schmalen Bildschirmen das Layout — obwohl der Inhalt selbst scrollen koennte.
+  */
+  .card {
+    @apply min-w-0 rounded-ui border border-border bg-surface-raised shadow-sm;
+  }
+  .card-header { @apply flex items-center justify-between gap-3 border-b border-border px-5 py-4; }
+  .card-title  { @apply text-base font-semibold text-content; }
+  .card-body   { @apply px-5 py-4; }
+  .card-footer { @apply border-t border-border bg-surface-sunken px-5 py-3; }
+
+  /* --- Abzeichen -------------------------------------------------------- */
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5
+           text-xs font-medium whitespace-nowrap;
+  }
+  .badge-neutral { @apply bg-surface-sunken text-muted; }
+  .badge-brand   { @apply bg-brand-subtle text-brand; }
+  .badge-success { @apply bg-success-subtle text-success; }
+  .badge-warning { @apply bg-warning-subtle text-warning; }
+  .badge-danger  { @apply bg-danger-subtle text-danger; }
+
+  /* --- Hinweisleiste ---------------------------------------------------- */
+
+  .alert {
+    @apply flex items-start gap-3 rounded-ui border px-4 py-3 text-sm;
+  }
+  .alert-info    { @apply border-border bg-surface-sunken text-content; }
+  .alert-success { @apply border-success/30 bg-success-subtle text-success; }
+  .alert-warning { @apply border-warning/30 bg-warning-subtle text-warning; }
+  .alert-danger  { @apply border-danger/30 bg-danger-subtle text-danger; }
+
+  /* --- Tabelle ---------------------------------------------------------- */
+
+  /* Die Huelle scrollt waagerecht, damit schmale Bildschirme nicht brechen. */
+  .table-wrap { @apply w-full overflow-x-auto rounded-ui border border-border; }
+  .table      { @apply w-full border-collapse text-sm; }
+  .table thead { @apply bg-surface-sunken; }
+  .table th {
+    @apply px-4 py-3 text-left text-xs font-semibold tracking-wide text-muted uppercase whitespace-nowrap;
+  }
+  .table td { @apply border-t border-border px-4 py-3 text-content align-middle; }
+  .table tbody tr:hover { @apply bg-surface-sunken/60; }
+
+  /* --- Navigation ------------------------------------------------------- */
+
+  .nav-link {
+    @apply rounded-ui px-3 py-2 text-sm font-medium text-muted
+           transition-colors hover:bg-surface-sunken hover:text-content;
+  }
+  .nav-link-active { @apply bg-brand-subtle text-brand; }
+
+  /* --- Untere Leiste (nur schmale Bildschirme) --------------------------- */
+
+  /*
+    Die Hauptnavigation sitzt auf dem Telefon unten, weil dort die Daumen sind.
+    `env(safe-area-inset-bottom)` haelt die Leiste oberhalb des Balkens, den
+    iPhones ohne Home-Knopf am unteren Rand einblenden — sonst liegt der
+    letzte Eintrag darunter und ist nicht zu treffen.
+  */
+  .tabbar {
+    @apply fixed inset-x-0 bottom-0 z-40 flex border-t border-border
+           bg-surface-raised/95 backdrop-blur;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .tab {
+    @apply flex flex-1 flex-col items-center justify-center gap-1 px-1 py-2
+           text-[0.6875rem] font-medium text-muted transition-colors;
+    min-height: 3.25rem;
+  }
+
+  .tab-active { @apply text-brand; }
+
+  /* Das aufgeklappte Menue faehrt von unten herein, ueber die Leiste. */
+  .sheet {
+    @apply fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-border
+           bg-surface-raised shadow-lg;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation: sheet-in 180ms ease-out;
+  }
+
+  .sheet-hintergrund {
+    @apply fixed inset-0 z-40;
+    background: oklch(0 0 0 / 0.45);
+  }
+
+  @keyframes sheet-in {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+
+  /*
+    Fassung fuer das aufgeklappte Menue auf schmalen Bildschirmen: volle Breite,
+    groessere Schrift und mindestens 44 px hoch — die uebliche Mindestgroesse
+    fuer eine Flaeche, die mit dem Finger getroffen werden soll.
+  */
+  .nav-link-mobile {
+    @apply block rounded-ui px-3 py-3 text-base font-medium text-muted
+           transition-colors hover:bg-surface-sunken hover:text-content;
+  }
+
+
+  /* --- Leerzustand ------------------------------------------------------ */
+
+  .empty {
+    @apply flex flex-col items-center justify-center gap-3
+           rounded-ui border border-dashed border-border px-6 py-12 text-center;
+  }
+  .empty-title { @apply text-sm font-medium text-content; }
+  .empty-hint  { @apply text-sm text-muted; }
+
+  /* --- Code ------------------------------------------------------------- */
+
+  .code {
+    @apply rounded-ui bg-surface-sunken px-2 py-1 font-mono text-xs text-content;
+  }
+  .code-block {
+    @apply overflow-x-auto rounded-ui bg-surface-sunken p-4 font-mono text-xs
+           leading-relaxed text-content;
+  }
+
+  /* --- Meldungen (Toasts) ----------------------------------------------- */
+
+  .toast-region {
+    @apply pointer-events-none fixed inset-x-0 bottom-4 z-50 flex flex-col
+           items-center gap-2 px-4;
+  }
+  .toast {
+    @apply pointer-events-auto flex items-center gap-3 rounded-ui border
+           border-border bg-surface-raised px-4 py-3 text-sm shadow-lg;
+    animation: toast-in 200ms ease-out;
+  }
+  .toast-success { @apply border-success/40; }
+  .toast-danger  { @apply border-danger/40; }
+
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(0.5rem); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* ==========================================================================
+   htmx
+   --------------------------------------------------------------------------
+   htmx setzt waehrend einer Anfrage die Klasse .htmx-request auf das
+   ausloesende Element. Damit blenden wir Ladeanzeigen ein, ohne eine Zeile
+   JavaScript zu schreiben.
+   ========================================================================== */
+
+.htmx-indicator {
+  opacity: 0;
+  transition: opacity 150ms ease-in;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  opacity: 1;
+}
+
+/* Waehrend einer Anfrage ist das Element nicht noch einmal ausloesbar. */
+.htmx-request.btn {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Sanftes Einblenden ausgetauschter Inhalte. */
+.htmx-swapping { opacity: 0; transition: opacity 100ms ease-out; }
+.htmx-added    { opacity: 0; }
+.htmx-settling { opacity: 1; transition: opacity 150ms ease-in; }
+
+.spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 9999px;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -1,0 +1,62 @@
+{#
+  Musterseite fuer eine Ressource: Liste plus Anlegeformular, beides ueber
+  htmx ohne Seitenneuladen. Das ist die Vorlage zum Kopieren.
+#}
+{% extends "layout/app.html" %}
+{% import "components/macros.html" as ui %}
+{% block title %}Notizen{% endblock %}
+
+{% block main %}
+<div class="mb-6 flex items-end justify-between gap-4">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight">Notizen</h1>
+    <p class="mt-1 text-sm text-muted">Beispielressource. Zeigt Anlegen, Auflisten und Löschen.</p>
+  </div>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-[20rem_1fr]">
+
+  {# --- Anlegen --------------------------------------------------------- #}
+  <div class="card h-fit">
+    <div class="card-header"><h2 class="card-title">Neue Notiz</h2></div>
+    <form class="card-body stack"
+          hx-post="/notes"
+          hx-target="#note-list"
+          hx-swap="afterbegin"
+          {# Formular nach erfolgreichem Absenden leeren #}
+          hx-on::after-request="if (event.detail.successful) this.reset()">
+
+      <div class="field">
+        <label class="label" for="title">Titel</label>
+        <input class="input" type="text" id="title" name="title" required maxlength="200">
+      </div>
+
+      <div class="field">
+        <label class="label" for="body">Text</label>
+        <textarea class="textarea" id="body" name="body" rows="4"></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">
+        <span class="htmx-indicator spinner"></span>
+        Speichern
+      </button>
+    </form>
+  </div>
+
+  {# --- Liste ------------------------------------------------------------ #}
+  <div>
+    <div id="note-list" class="stack">
+      {% for note in notes %}
+        {% call ui::note_item(note) %}{% endcall %}
+      {% endfor %}
+    </div>
+
+    {% if notes.is_empty() %}
+      <div class="empty" id="note-empty">
+        <p class="empty-title">Noch keine Notizen</p>
+        <p class="empty-hint">Leg mit dem Formular die erste an.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

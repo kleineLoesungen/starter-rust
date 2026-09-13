@@ -1,0 +1,54 @@
+{% extends "layout/app.html" %}
+{% block title %}Übersicht{% endblock %}
+
+{% block main %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">Hallo, {{ user.display_name }}</h1>
+  <p class="mt-1 text-sm text-muted">
+    Angemeldet als <span class="badge badge-brand">{{ user.role.label() }}</span>
+  </p>
+</div>
+
+<div class="grid gap-4 sm:grid-cols-3">
+  <a href="/notes" class="card transition-shadow hover:shadow-md">
+    <div class="card-body">
+      <p class="text-3xl font-semibold tabular-nums">{{ note_count }}</p>
+      <p class="mt-1 text-sm text-muted">Notizen</p>
+    </div>
+  </a>
+
+  {% if let Some(anzahl) = token_count %}
+    <a href="/admin/tokens" class="card transition-shadow hover:shadow-md">
+      <div class="card-body">
+        <p class="text-3xl font-semibold tabular-nums">{{ anzahl }}</p>
+        <p class="mt-1 text-sm text-muted">App-Tokens</p>
+      </div>
+    </a>
+  {% else %}
+    <a href="/account" class="card transition-shadow hover:shadow-md">
+      <div class="card-body">
+        <p class="text-3xl font-semibold">{{ user.initials() }}</p>
+        <p class="mt-1 text-sm text-muted">Mein Konto</p>
+      </div>
+    </a>
+  {% endif %}
+
+  <a href="/styleguide" class="card transition-shadow hover:shadow-md">
+    <div class="card-body">
+      <p class="text-3xl font-semibold">◐</p>
+      <p class="mt-1 text-sm text-muted">Styleguide</p>
+    </div>
+  </a>
+</div>
+
+<div class="card mt-8">
+  <div class="card-header"><h2 class="card-title">Nächste Schritte</h2></div>
+  <div class="card-body">
+    <ol class="list-inside list-decimal space-y-2 text-sm text-muted">
+      <li>Erscheinungsbild anpassen in <code class="code">assets/css/theme.css</code></li>
+      <li>Eigene Ressource nach dem Muster von <code class="code">src/domain/note.rs</code> anlegen</li>
+      <li>Eigenes Passwort unter <a href="/account" class="text-brand hover:underline">Mein Konto</a> ändern</li>
+    </ol>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,4 @@
+# Alle Mitwirkenden und die Container-Builds benutzen dieselbe Rust-Version.
+[toolchain]
+channel = "1.96"
+components = ["rustfmt", "clippy"]

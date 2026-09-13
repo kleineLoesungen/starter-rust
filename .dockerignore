@@ -1,0 +1,6 @@
+/target
+/.bin
+/.git
+.env
+*.md
+/docs
