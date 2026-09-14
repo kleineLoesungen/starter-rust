@@ -25,6 +25,10 @@ use crate::mail::Mailer;
 use crate::state::AppState;
 use crate::{api, auth, pwa, templates, web};
 
+/// Name des Session-Cookies. Pro Projekt eindeutig, damit zwei Anwendungen
+/// auf demselben Rechner (beide auf localhost) sich nicht gegenseitig abmelden.
+pub const SESSION_COOKIE: &str = "starter_session";
+
 /// Wie lange eine Anmeldung ohne Aktivitaet gueltig bleibt.
 const SESSION_DAYS: i64 = 14;
 
@@ -88,7 +92,7 @@ pub async fn build_with_mailer(
     });
 
     let session_layer = SessionManagerLayer::new(session_store)
-        .with_name("starter_session")
+        .with_name(SESSION_COOKIE)
         // Ohne HTTPS kann das Cookie nicht "secure" sein — sonst funktioniert
         // die lokale Entwicklung nicht. In Produktion COOKIE_SECURE=true.
         .with_secure(config.cookie_secure)

@@ -282,6 +282,14 @@ Zwei Dinge, die auf schmalen Bildschirmen regelmäßig schiefgehen:
 just check     # Formatierung, Clippy (streng), alle Tests
 ```
 
+**Es gibt keine CI.** `just check` ist die einzige Prüfung, die Fehler vor dem
+Commit abfängt. Deshalb:
+
+* Vor jeder Meldung „fertig" `just check` ausführen und das Ergebnis nennen.
+* Ein roter Lauf heißt: nicht fertig. Nicht committen, nicht als erledigt melden.
+* Ein Test, der nur durch Anpassen der Erwartung grün wird, ist verdächtig —
+  erst klären, ob der Code oder der Test falsch ist.
+
 Bei Template- oder CSS-Änderungen zusätzlich `just css`.
 Nach einer Änderung an `assets/icons/*.svg` zusätzlich `./scripts/icons.sh`.
 Wer `--brand-hue` in `theme.css` ändert, zieht `PWA_THEME_COLOR` und die

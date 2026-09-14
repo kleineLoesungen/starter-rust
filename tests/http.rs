@@ -8,7 +8,7 @@ use axum::http::{Request, StatusCode, header};
 use http_body_util::BodyExt;
 use sqlx::PgPool;
 use starter::auth::{Role, scope};
-use starter::config::Config;
+use starter::config::{Branding, Config};
 use starter::domain::{api_token, user};
 use starter::mail::Mailer;
 use tower::ServiceExt;
@@ -723,7 +723,7 @@ async fn nach_zwei_fehlversuchen_klappt_das_richtige_passwort_noch(db: PgPool) {
     fehlversuch(&app, "zweimal@example.com").await;
 
     let cookie = anmelden(&app, "zweimal@example.com", "einsehrlangespasswort").await;
-    assert!(cookie.contains("starter_session"));
+    assert!(cookie.contains(starter::app::SESSION_COOKIE));
 }
 
 #[sqlx::test]
@@ -816,7 +816,7 @@ async fn die_sperre_gilt_nur_fuer_das_betroffene_konto(db: PgPool) {
     }
 
     let cookie = anmelden(&app, "unbeteiligt@example.com", "einsehrlangespasswort").await;
-    assert!(cookie.contains("starter_session"));
+    assert!(cookie.contains(starter::app::SESSION_COOKIE));
 }
 
 // --- Fehlerseite -------------------------------------------------------------
@@ -878,7 +878,7 @@ async fn manifest_nennt_name_farben_und_vorhandene_icons(db: PgPool) {
     );
 
     let manifest: serde_json::Value = serde_json::from_str(&text(antwort).await).unwrap();
-    assert_eq!(manifest["name"], "Starter");
+    assert_eq!(manifest["name"], Branding::default().name);
     assert_eq!(manifest["display"], "standalone");
     assert_eq!(manifest["theme_color"], "#3370c7");
 
@@ -1081,7 +1081,7 @@ async fn testmail_kommt_mit_text_und_html_an(db: PgPool) {
     assert_eq!(mails.len(), 1);
     let mail = &mails[0];
     assert_eq!(mail.recipient(), "empfaenger@example.com");
-    assert!(mail.subject_line().contains("Starter"));
+    assert!(mail.subject_line().contains(&Branding::default().name));
     assert!(mail.text_body().contains("funktioniert"));
     let html = mail.html_body().expect("HTML-Fassung vorhanden");
     assert!(html.contains("#3370c7"), "Markenfarbe fehlt im Mail-Layout");

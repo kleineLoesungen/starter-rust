@@ -37,6 +37,31 @@ cargo run
 
 ---
 
+## Eigenes Projekt aus dem Kit
+
+Das Kit selbst bleibt unverändert. Für jede Anwendung eine eigene Kopie:
+
+```bash
+git clone <pfad-oder-url-zum-kit> vereinsportal
+cd vereinsportal
+./scripts/new-project.sh vereinsportal "Vereinsportal"
+just setup
+just check
+```
+
+Das Skript benennt alles um, was „starter" heißt, und wählt freie Ports.
+**Direkt nach dem Klonen ausführen, vor jedem `just`-Befehl:** Bis dahin heißt
+der Klon noch „starter" und würde die Container des Kits benutzen — ein
+`just db-reset` löschte dann dessen Datenbank.
+**Nicht auslassen**, auch wenn nur ein Projekt geplant ist: Zwei Projekte mit
+dem Namen „starter" teilen sich unbemerkt Container und Datenbank — das zweite
+überschreibt die Daten des ersten.
+
+Die Ports stehen danach in `.env` und `compose.yaml`; das Skript nennt sie am
+Ende. Zeigt `git remote -v` noch auf das Kit: `git remote remove origin`.
+
+---
+
 ## Was drin ist
 
 | Bereich | Umsetzung |
