@@ -186,7 +186,7 @@
     animation: sheet-in 180ms ease-out;
   }
 
-  .sheet-hintergrund {
+  .sheet-backdrop {
     @apply fixed inset-0 z-40;
     background: oklch(0 0 0 / 0.45);
   }

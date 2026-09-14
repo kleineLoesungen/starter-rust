@@ -37,6 +37,18 @@ Die gesamte Akzentfarbe der Anwendung hängt an einer einzigen Variablen:
 Ändern, `just css` ausführen, Seite neu laden — Knöpfe, Links, Abzeichen,
 Fokusringe und selbst die leichte Tönung der Hintergründe wandern mit.
 
+> **Drei Stellen folgen der Zahl NICHT von selbst:** die Farbe der Browser- und
+> Statusleiste, die App-Icons und die Knöpfe in HTML-Mails. Browser, Telefone und
+> Mailprogramme lesen kein Stylesheet — sie brauchen eine feste Farbe.
+> Wer `--brand-hue` ändert, zieht deshalb nach:
+>
+> 1. `PWA_THEME_COLOR` in `.env` (Leiste und Mail-Knöpfe)
+> 2. die Füllfarbe in `assets/icons/icon.svg` und `icon-maskable.svg`,
+>    danach `./scripts/icons.sh`
+>
+> Den passenden Hex-Wert zeigt der Browser: im Styleguide mit den
+> Entwicklerwerkzeugen die Farbe von `bg-brand` untersuchen.
+
 **Ausprobieren ohne Neustart:** Der [Styleguide](http://localhost:3000/styleguide)
 hat Regler für Farbton, Farbkraft und Rundung. Wenn es passt, den Wert in
 `theme.css` eintragen.
@@ -208,7 +220,7 @@ Mobilfassung zu pflegen. Eine Codebasis, zwei Erscheinungsformen.
 
 ### Die Navigation wandert nach unten
 
-Ab der Breite `md` (768 px) steht die Navigation waagerecht in der Kopfzeile.
+Ab der Breite `lg` (1024 px) steht die Navigation waagerecht in der Kopfzeile.
 Darunter sitzt sie als Leiste **am unteren Rand** — dort sind beim Halten des
 Geräts die Daumen, oben käme man nur mit Umgreifen hin.
 
@@ -226,8 +238,8 @@ Makro `nav_links` in `templates/layout/app.html`, das zweimal mit
 unterschiedlichen Klassen aufgerufen wird:
 
 ```jinja
-{% macro nav_links(layout, klasse) %}
-  <a href="/berichte" class="{{ klasse }} {% if layout.is_active("/berichte") %}nav-link-active{% endif %}">Berichte</a>
+{% macro nav_links(layout, class_name) %}
+  <a href="/reports" class="{{ class_name }} {% if layout.is_active("/reports") %}nav-link-active{% endif %}">Berichte</a>
 {% endmacro %}
 ```
 
@@ -241,9 +253,10 @@ pro Eintrag. Wer einen Punkt auch dort haben will, trägt ihn zusätzlich ein.
 Vollständig ist immer das Blatt hinter „Mehr"; niemand verliert also einen
 Menüpunkt, nur weil er ihn nicht in die Leiste aufgenommen hat.
 
-> Bei exakt 768 px ist die Kopfzeile mit fünf Einträgen knapp gefüllt. Wer mehr
-> hinzufügt oder einen langen Anwendungsnamen setzt, verschiebt die Umschaltung
-> besser auf `lg`: in `app.html` alle `md:`-Präfixe durch `lg:` ersetzen.
+> Die Umschaltung liegt bei `lg`, nicht bei `md`: Mit sechs Einträgen für
+> Administratoren braucht die Kopfzeile rund 820 px. Wer weitere Einträge
+> hinzufügt, prüft die Breite bei 1024 px — reicht sie nicht, auf `xl`
+> verschieben (alle `lg:`-Präfixe in `app.html` und die `64rem` im Skript).
 
 ### Zeitstempel
 
@@ -253,15 +266,15 @@ Zeitzone. Deshalb gibt der Server nur den maschinenlesbaren Wert aus und lässt
 den Browser rechnen:
 
 ```jinja
-{% call ui::zeit(note.created_at) %}{% endcall %}
-{% call ui::zeit_kurz(u.created_at) %}{% endcall %}
+{% call ui::datetime(note.created_at) %}{% endcall %}
+{% call ui::date(u.created_at) %}{% endcall %}
 ```
 
 Daraus wird `<time datetime="…Z">13.09.2026, 06:46</time>`; ein kleines Skript
 in `base.html` ersetzt den Text durch die Ortszeit und hängt die vollständige
 Angabe als Tooltip an. Ohne JavaScript bleibt die UTC-Fassung stehen.
 
-**Nie `{{ wert.datum() }}` direkt ins Template schreiben** — das ist die
+**Nie `{{ value.date_time() }}` direkt ins Template schreiben** — das ist die
 UTC-Fassung und damit im Sommer zwei Stunden daneben.
 
 ### Der häufigste Layout-Fehler auf schmalen Bildschirmen
@@ -303,7 +316,34 @@ Ist das `true`, gibt es irgendwo einen waagerechten Überlauf.
 
 ---
 
-## 8. Barrierefreiheit
+## 8. Name, Icon und installierte App
+
+Was außerhalb der Seite erscheint — Browser-Tab, Startbildschirm, Mails —
+kommt nicht aus `theme.css`, sondern aus Umgebungsvariablen und Dateien:
+
+| Was | Wo |
+|---|---|
+| Name in Titel, Kopfzeile, installierter App | `APP_NAME` |
+| Name unter dem Icon (≈ 12 Zeichen) | `APP_SHORT_NAME` |
+| Farbe der Browser-/Statusleiste, Mail-Knöpfe | `PWA_THEME_COLOR` |
+| Hintergrund beim Start der App | `PWA_BACKGROUND_COLOR` |
+| Icon | `assets/icons/*.svg` → `./scripts/icons.sh` |
+
+Zwei Icon-Fassungen, weil Android Icons je nach Gerät rund, eckig oder als
+Tropfen zuschneidet:
+
+- `icon.svg` — mit abgerundeten Ecken, für Browser und Desktop
+- `icon-maskable.svg` — vollflächig ohne Rundung, Motiv nur in den mittleren
+  80 %, damit beim Zuschneiden nichts verloren geht
+
+In Templates stehen Name und Farbe als `layout.app_name` und
+`layout.theme_color` bereit, in Rust über `templates::branding()`.
+
+Was gerade gilt, zeigt die Seite **System** unter `/admin/system`.
+
+---
+
+## 9. Barrierefreiheit
 
 Eingebaut und bitte nicht entfernen:
 
@@ -319,7 +359,7 @@ Eingebaut und bitte nicht entfernen:
 
 ---
 
-## 9. Änderungen prüfen
+## 10. Änderungen prüfen
 
 Nach jeder Anpassung den [Styleguide](http://localhost:3000/styleguide) öffnen und
 durchsehen — in beiden Modi. Er zeigt jede Komponente im echten Zustand. Was

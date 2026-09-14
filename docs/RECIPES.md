@@ -18,14 +18,15 @@ Jedes Rezept ist vollständig — abtippen und anpassen.
 9. [Einen neuen Scope](#9-einen-neuen-scope)
 10. [Eine vierte Rolle](#10-eine-vierte-rolle)
 11. [Eine neue Umgebungsvariable](#11-eine-neue-umgebungsvariable)
+12. [Eine E-Mail verschicken](#12-eine-e-mail-verschicken)
 
 ---
 
 ## 1. Eine neue Seite
 
-**Beispiel: `/berichte`**
+**Beispiel: `/reports`**, eine Seite „Berichte"
 
-**a) Template** — `templates/pages/berichte.html`
+**a) Template** — `templates/pages/reports.html`
 
 ```jinja
 {% extends "layout/app.html" %}
@@ -33,7 +34,7 @@ Jedes Rezept ist vollständig — abtippen und anpassen.
 
 {% block main %}
 <h1 class="text-2xl font-semibold tracking-tight">Berichte</h1>
-<p class="mt-1 text-sm text-muted">{{ anzahl }} Einträge</p>
+<p class="mt-1 text-sm text-muted">{{ count }} Einträge</p>
 {% endblock %}
 ```
 
@@ -41,20 +42,20 @@ Jedes Rezept ist vollständig — abtippen und anpassen.
 
 ```rust
 #[derive(Template)]
-#[template(path = "pages/berichte.html")]
-pub struct BerichtePage {
+#[template(path = "pages/reports.html")]
+pub struct ReportsPage {
     pub layout: Layout,
-    pub anzahl: usize,
+    pub count: usize,
 }
 ```
 
 **c) Handler** — in `src/web/pages.rs`
 
 ```rust
-pub async fn berichte(CurrentUser(user): CurrentUser) -> Result<Response, WebError> {
-    render(BerichtePage {
-        layout: Layout::for_user("Berichte", user, "/berichte"),
-        anzahl: 0,
+pub async fn reports(CurrentUser(user): CurrentUser) -> Result<Response, WebError> {
+    render(ReportsPage {
+        layout: Layout::for_user("Berichte", user, "/reports"),
+        count: 0,
     })
 }
 ```
@@ -62,50 +63,59 @@ pub async fn berichte(CurrentUser(user): CurrentUser) -> Result<Response, WebErr
 **d) Route** — in `src/web/mod.rs`
 
 ```rust
-.route("/berichte", get(pages::berichte))
+.route("/reports", get(pages::reports))
 ```
 
-**e) Navigation** (falls gewünscht) — in `templates/layout/app.html`
+**e) Navigation** (falls gewünscht) — im Makro `nav_links` in `templates/layout/app.html`:
 
 ```jinja
-<a href="/berichte" class="nav-link {% if layout.is_active("/berichte") %}nav-link-active{% endif %}">Berichte</a>
+<a href="/reports" class="{{ class_name }} {% if layout.is_active("/reports") %}nav-link-active{% endif %}">Berichte</a>
 ```
 
+Im Makro, nicht direkt im Markup: Es erscheint dann in der Kopfzeile und im
+Menü auf dem Telefon.
+
 `cargo check` — Askama meldet Tippfehler im Template sofort.
+
+Bezeichner englisch (`reports`, `ReportsPage`, `count`), sichtbarer Text deutsch
+(„Berichte", „Einträge") — siehe [CLAUDE.md](../CLAUDE.md#sprache-im-code).
 
 ---
 
 ## 2. Eine neue Ressource mit CRUD
 
 **Der schnellste Weg: `note` kopieren und umbenennen.** Die Beispielressource
-ist genau dafür da. Am Beispiel „Projekt":
+ist genau dafür da. Am Beispiel „Projekt" (`project`):
 
 ```bash
-cp src/domain/note.rs src/domain/projekt.rs
-cp src/web/notes.rs   src/web/projekte.rs
-cp src/api/v1/notes.rs src/api/v1/projekte.rs
-cp templates/pages/notes.html templates/pages/projekte.html
+cp src/domain/note.rs src/domain/project.rs
+cp src/web/notes.rs   src/web/projects.rs
+cp src/api/v1/notes.rs src/api/v1/projects.rs
+cp templates/pages/notes.html templates/pages/projects.html
 ```
 
-Dann in den Kopien `note`→`projekt`, `Note`→`Projekt`, `notes`→`projekte`
+Dann in den Kopien `note`→`project`, `Note`→`Project`, `notes`→`projects`
 ersetzen und die Module in `src/domain/mod.rs`, `src/web/mod.rs`,
 `src/api/v1/mod.rs` eintragen.
 
-**Migration** — `migrations/0002_projekte.sql`:
+**Migration** — `migrations/0005_projects.sql`:
+
+> Die Nummer ist die **nächste freie**. `ls migrations/` zeigt die letzte.
+> Eine doppelte Nummer lässt den Start scheitern.
 
 ```sql
-CREATE TABLE projekte (
+CREATE TABLE projects (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name       TEXT        NOT NULL,
-    notiz      TEXT        NOT NULL DEFAULT '',
+    description TEXT       NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX projekte_user_id_created_at_idx ON projekte (user_id, created_at DESC);
+CREATE INDEX projects_user_id_created_at_idx ON projects (user_id, created_at DESC);
 
-CREATE TRIGGER projekte_updated_at BEFORE UPDATE ON projekte
+CREATE TRIGGER projects_updated_at BEFORE UPDATE ON projects
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 ```
 
@@ -127,10 +137,10 @@ Migrationen laufen beim nächsten Start automatisch.
 **Nie eine bestehende Migration ändern** — sie ist auf anderen Installationen
 schon gelaufen. Immer eine neue Datei anlegen:
 
-`migrations/0003_notes_erledigt.sql`:
+`migrations/0005_notes_done.sql` (nächste freie Nummer):
 
 ```sql
-ALTER TABLE notes ADD COLUMN erledigt BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE notes ADD COLUMN done BOOLEAN NOT NULL DEFAULT FALSE;
 ```
 
 Dann in `src/domain/note.rs`:
@@ -138,10 +148,10 @@ Dann in `src/domain/note.rs`:
 ```rust
 pub struct Note {
     …
-    pub erledigt: bool,
+    pub done: bool,
 }
 
-const COLUMNS: &str = "id, user_id, title, body, erledigt, created_at, updated_at";
+const COLUMNS: &str = "id, user_id, title, body, done, created_at, updated_at";
 ```
 
 Die `COLUMNS`-Konstante nicht vergessen — sonst kommt zur Laufzeit ein
@@ -154,8 +164,8 @@ Decode-Fehler, weil die Spalte in der Abfrage fehlt.
 Nur der Extractor in der Signatur ändert sich:
 
 ```rust
-pub async fn seite(ModeratorUser(user): ModeratorUser) -> …   // ab Moderator
-pub async fn seite(AdminUser(user): AdminUser) -> …           // nur Admin
+pub async fn page(ModeratorUser(user): ModeratorUser) -> …   // ab Moderator
+pub async fn page(AdminUser(user): AdminUser) -> …           // nur Admin
 ```
 
 Wer die Rolle nicht hat, bekommt automatisch eine 403-Seite; wer nicht
@@ -180,7 +190,7 @@ Das Muster hat drei Teile: Auslöser, Ziel, Fragment.
 **Markup:**
 
 ```html
-<button hx-get="/notes/suche?q=rust"
+<button hx-get="/notes/search?q=rust"
         hx-target="#note-list"
         hx-swap="innerHTML">
   <span class="htmx-indicator spinner"></span>
@@ -193,7 +203,7 @@ Das Muster hat drei Teile: Auslöser, Ziel, Fragment.
 **Handler** — gibt **nur das Fragment** zurück, keine ganze Seite:
 
 ```rust
-pub async fn suche(
+pub async fn search(
     State(state): State<AppState>,
     CurrentUser(user): CurrentUser,
 ) -> Result<Response, WebError> {
@@ -228,8 +238,8 @@ Das Template braucht dafür nur eine Zeile:
 Und das Struct ein Feld:
 
 ```rust
-pub struct MeinPartial {
-    pub daten: …,
+pub struct MyPartial {
+    pub data: …,
     pub toast: Option<Toast>,
 }
 ```
@@ -237,8 +247,8 @@ pub struct MeinPartial {
 Im Handler:
 
 ```rust
-render(MeinPartial {
-    daten,
+render(MyPartial {
+    data,
     toast: Some(Toast::success("Gespeichert.")),   // oder Toast::error(…)
 })
 ```
@@ -255,14 +265,14 @@ Fehlermeldung und **erhaltenen Eingaben**, damit der Benutzer nicht alles
 neu tippen muss:
 
 ```rust
-match domain::etwas_tun(&state.db, &form).await {
-    Ok(_) => Ok(Redirect::to("/ziel").into_response()),
+match domain::do_something(&state.db, &form).await {
+    Ok(_) => Ok(Redirect::to("/target").into_response()),
     Err(err) => {
         let status = err.status();
-        let body = render(MeineSeite {
-            layout: Layout::new("Titel", None, "/pfad"),
+        let body = render(MyPage {
+            layout: Layout::new("Titel", None, "/path"),
             error: Some(err.public_message()),
-            eingabe: form.eingabe,        // ← stehen lassen
+            input: form.input,            // ← stehen lassen
         })?;
         Ok((status, body).into_response())
     }
@@ -290,19 +300,19 @@ einer Rolle — hinter einem Token steht kein Benutzer.
 use crate::api::v1::Data;
 use crate::auth::extract::NotesRead;
 
-pub async fn statistik(
+pub async fn statistics(
     State(state): State<AppState>,
     _: NotesRead,                       // ← verlangt Scope notes:read
 ) -> Result<Json<Data<serde_json::Value>>, ApiError> {
-    let anzahl = note::list_all(&state.db, None).await?.len();
-    Ok(Data::new(serde_json::json!({ "notizen": anzahl })))
+    let count = note::list_all(&state.db, None).await?.len();
+    Ok(Data::new(serde_json::json!({ "notes": count })))
 }
 ```
 
 Route in `src/api/v1/mod.rs` eintragen:
 
 ```rust
-.route("/statistik", get(statistik))
+.route("/statistics", get(statistics))
 ```
 
 Beachten:
@@ -326,17 +336,17 @@ pub async fn info(ApiClient { token }: ApiClient) -> …
 
 ## 9. Einen neuen Scope
 
-Am Beispiel `berichte:read`. Drei Stellen:
+Am Beispiel `reports:read`. Drei Stellen:
 
 **a) `src/auth/scope.rs`** — Konstante und Eintrag in `ALL`:
 
 ```rust
-pub const BERICHTE_READ: &str = "berichte:read";
+pub const REPORTS_READ: &str = "reports:read";
 
 pub const ALL: &[Scope] = &[
     // … bestehende …
     Scope {
-        name: BERICHTE_READ,
+        name: REPORTS_READ,
         label: "Berichte lesen",
         description: "Auswertungen abrufen",
     },
@@ -349,10 +359,10 @@ zeigt einfach alles aus `ALL`.
 **b) `src/auth/extract.rs`** — Extractor erzeugen:
 
 ```rust
-scope_extractor!(BerichteRead, scope::BERICHTE_READ, "Token mit Scope `berichte:read`.");
+scope_extractor!(ReportsRead, scope::REPORTS_READ, "Token mit Scope `reports:read`.");
 ```
 
-**c) Endpunkte** mit `_: BerichteRead` in der Signatur versehen und in
+**c) Endpunkte** mit `_: ReportsRead` in der Signatur versehen und in
 [docs/API.md](API.md) beschreiben.
 
 > Bestehende Tokens bekommen den neuen Scope **nicht** nachträglich. Das ist
@@ -365,10 +375,10 @@ scope_extractor!(BerichteRead, scope::BERICHTE_READ, "Token mit Scope `berichte:
 
 Drei Stellen, in dieser Reihenfolge:
 
-**a) Migration** — `migrations/000X_rolle_redakteur.sql`:
+**a) Migration** — `migrations/0005_role_editor.sql` (nächste freie Nummer):
 
 ```sql
-ALTER TYPE user_role ADD VALUE 'redakteur' AFTER 'moderator';
+ALTER TYPE user_role ADD VALUE 'editor' AFTER 'moderator';
 ```
 
 **b) `src/auth/role.rs`** — Variante, `rank()`, `as_str()`, `label()`,
@@ -378,8 +388,8 @@ weil alle `match`-Ausdrücke vollständig sein müssen.
 **c) Extractor** — in `src/auth/extract.rs`:
 
 ```rust
-pub struct RedakteurUser(pub user::User);
-role_extractor!(RedakteurUser, Role::Redakteur);
+pub struct EditorUser(pub user::User);
+role_extractor!(EditorUser, Role::Editor);
 ```
 
 > `ALTER TYPE ... ADD VALUE` läuft in PostgreSQL nicht innerhalb einer
@@ -390,26 +400,117 @@ role_extractor!(RedakteurUser, Role::Redakteur);
 
 ## 11. Eine neue Umgebungsvariable
 
+Am Beispiel `UPLOAD_MAX_MB`, der größten erlaubten Dateigröße.
+
 **a) `src/config.rs`** — Feld ergänzen und in `from_env()` lesen:
 
 ```rust
 pub struct Config {
     …
-    pub smtp_url: String,
+    /// Größte erlaubte Upload-Größe in Megabyte.
+    pub upload_max_mb: u32,
 }
 
 // in from_env():
-smtp_url: optional("SMTP_URL", "smtp://localhost:1025"),
-// oder, wenn zwingend:
-smtp_url: require("SMTP_URL")?,
+upload_max_mb: optional("UPLOAD_MAX_MB", "10").parse()?,
+// zwingend erforderlich statt mit Vorgabe:
+upload_max_mb: require("UPLOAD_MAX_MB")?.parse()?,
 ```
 
-**b) `.env.example`** — mit Kommentar eintragen.
+Gehören mehrere Werte zusammen, ein eigenes Struct anlegen — so wie `Branding`
+(Name, Farben) und `MailConfig` (SMTP, Absender). Farben mit `color(…)` lesen,
+das prüft das Format schon beim Start.
 
-**c) `compose.yaml`** — unter `app.environment` ergänzen, falls im Container nötig.
+**b) `Config::for_tests()`** — dort ebenfalls einen Wert eintragen. Der
+Compiler erinnert daran, weil das Struct dort vollständig aufgebaut wird.
 
-Benutzung im Handler: `state.config.smtp_url`.
+**c) `.env.example`** — mit Kommentar eintragen. Werte mit Leerzeichen oder
+`< >` in Anführungszeichen: Eine fehlerhafte `.env` bricht den Start ab.
+
+**d) `compose.yaml`** — unter `app.environment` ergänzen, falls im Container nötig.
+
+**e) Systemseite** — betriebsrelevante Werte in `templates/pages/admin_system.html`
+anzeigen, samt Variablennamen. Geheimnisse (Passwörter, Schlüssel) **nie**
+anzeigen, höchstens „gesetzt / nicht gesetzt".
+
+Benutzung im Handler: `state.config.upload_max_mb`.
 
 > Umgebungsvariablen werden **nur** in `config.rs` gelesen. Kein
 > `std::env::var` irgendwo sonst — sonst weiß niemand mehr, was die Anwendung
 > alles an Einstellungen erwartet.
+
+---
+
+## 12. Eine E-Mail verschicken
+
+**Die kürzeste Form** — reiner Text, direkt im Handler:
+
+```rust
+use crate::mail::Mail;
+
+state.mailer.send(
+    Mail::to(&user.email)
+        .subject("Dein Konto ist eingerichtet")
+        .text("Hallo, du kannst dich jetzt anmelden."),
+).await?;
+```
+
+**`send` oder `send_in_background`?**
+
+| | wartet | Fehler | richtig für |
+|---|---|---|---|
+| `send(mail).await?` | ja | kommen im Handler an | Der Benutzer muss wissen, ob es geklappt hat |
+| `send_in_background(mail)` | nein | nur im Log | Benachrichtigungen — ein langsamer Mailserver hält dann keine Seite auf |
+
+**Mit HTML-Fassung** — drei Schritte:
+
+**a) Template** — `templates/mail/welcome.html`, erbt vom Mail-Rahmen:
+
+```jinja
+{% extends "mail/base.html" %}
+{% block subject %}Willkommen{% endblock %}
+
+{% block content %}
+<p style="margin:0 0 16px;">Hallo {{ name }},</p>
+<p style="margin:0;">dein Konto bei {{ brand.name }} ist eingerichtet.</p>
+{% endblock %}
+```
+
+In Mails **nur Inline-Styles** — Mailprogramme laden kein Stylesheet, und
+Tailwind-Klassen bedeuten dort nichts.
+
+**b) Struct** — in `src/mail/templates.rs`:
+
+```rust
+#[derive(Template)]
+#[template(path = "mail/welcome.html")]
+pub struct Welcome {
+    pub brand: Branding,   // Name und Farbe für den Rahmen
+    pub name: String,
+}
+```
+
+**c) Versenden:**
+
+```rust
+use crate::mail::{Mail, templates::Welcome};
+use crate::templates::branding;
+
+let template = Welcome { brand: branding().clone(), name: user.display_name.clone() };
+
+let mail = Mail::to(&user.email)
+    .subject(format!("Willkommen bei {}", branding().name))
+    .text(format!("Hallo {},\n\ndein Konto ist eingerichtet.", user.display_name))
+    .template(&template)?;
+
+state.mailer.send_in_background(mail);
+```
+
+Die Textfassung **immer** mitgeben. Manche Programme zeigen nur Text, und
+Spamfilter werten reine HTML-Mails ab.
+
+**Ansehen beim Entwickeln:** `just mail-up` startet Mailpit. Es nimmt jede Mail
+an, verschickt nichts und zeigt alles unter <http://localhost:58025>.
+
+**Testen:** `Mailer::in_memory()` sammelt Mails statt sie zu verschicken —
+Beispiel in `tests/http.rs`, `testmail_kommt_mit_text_und_html_an`.

@@ -7,7 +7,7 @@
     <div class="container-app flex h-14 items-center">
       <span class="font-semibold tracking-tight">{{ layout.app_name }}</span>
       <div class="ml-auto flex items-center gap-2">
-        {% if ersteinrichtung %}
+        {% if first_setup %}
           <a href="/register" class="btn btn-primary btn-sm">Einrichten</a>
         {% else %}
           <a href="/login" class="btn btn-primary btn-sm">Anmelden</a>
@@ -25,7 +25,7 @@
       Anmeldung, Rollen und App-Tokens sind bereits eingebaut.
     </p>
     <div class="row gap-3">
-      {% if ersteinrichtung %}
+      {% if first_setup %}
         <a href="/register" class="btn btn-primary btn-lg">Ersten Administrator anlegen</a>
       {% else %}
         <a href="/login" class="btn btn-primary btn-lg">Anmelden</a>

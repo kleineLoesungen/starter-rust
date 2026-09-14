@@ -21,8 +21,9 @@ use tower_sessions::{Expiry, SessionManagerLayer};
 use tower_sessions_sqlx_store::PostgresStore;
 
 use crate::config::Config;
+use crate::mail::Mailer;
 use crate::state::AppState;
-use crate::{api, auth, templates, web};
+use crate::{api, auth, pwa, templates, web};
 
 /// Wie lange eine Anmeldung ohne Aktivitaet gueltig bleibt.
 const SESSION_DAYS: i64 = 14;
@@ -35,6 +36,20 @@ pub async fn build(
     pool: PgPool,
     config: Config,
 ) -> anyhow::Result<(Router, tokio::task::JoinHandle<()>)> {
+    let mailer = Mailer::from_config(&config.mail)?;
+    build_with_mailer(pool, config, mailer).await
+}
+
+/// Wie [`build`], aber mit einem vorgegebenen Mailer — damit Tests Mails
+/// abfangen koennen, statt sie zu verschicken (`Mailer::in_memory()`).
+pub async fn build_with_mailer(
+    pool: PgPool,
+    config: Config,
+    mailer: Mailer,
+) -> anyhow::Result<(Router, tokio::task::JoinHandle<()>)> {
+    // Name und Farben einmalig fuer alle Templates hinterlegen.
+    templates::set_branding(config.branding.clone());
+
     // Sessions liegen in derselben Datenbank. Der Store bringt seine eigene
     // Migration mit und legt die Tabelle `tower_sessions` an.
     let session_store = PostgresStore::new(pool.clone());
@@ -48,11 +63,11 @@ pub async fn build(
     let cleanup = tokio::task::spawn(async move {
         // Abgelaufene Anmeldeversuche stuendlich wegraeumen, damit die Tabelle
         // nicht endlos waechst. Fehler sind unkritisch und werden nur geloggt.
-        let versuche = async {
-            let mut takt = tokio::time::interval(tokio::time::Duration::from_secs(3600));
+        let attempts = async {
+            let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(3600));
             loop {
-                takt.tick().await;
-                match crate::domain::login_versuch::aufraeumen(&cleanup_db).await {
+                ticker.tick().await;
+                match crate::domain::login_attempt::cleanup(&cleanup_db).await {
                     Ok(n) if n > 0 => tracing::debug!("{n} alte Anmeldeversuche entfernt"),
                     Ok(_) => {}
                     Err(e) => tracing::warn!("Anmeldeversuche aufraeumen fehlgeschlagen: {e}"),
@@ -69,7 +84,7 @@ pub async fn build(
             }
         };
 
-        tokio::join!(versuche, sessions);
+        tokio::join!(attempts, sessions);
     });
 
     let session_layer = SessionManagerLayer::new(session_store)
@@ -83,7 +98,7 @@ pub async fn build(
         .with_same_site(SameSite::Lax)
         .with_expiry(Expiry::OnInactivity(Duration::days(SESSION_DAYS)));
 
-    let state = AppState::new(pool, config);
+    let state = AppState::new(pool, config, mailer);
 
     let router = Router::new()
         // HTML-Oberflaeche — mit Herkunftspruefung gegen CSRF.
@@ -93,6 +108,8 @@ pub async fn build(
         )))
         // JSON-Schnittstelle — per Bearer-Token authentifiziert, daher ohne CSRF-Pruefung.
         .nest("/api", api::routes())
+        // Installierbare App: Manifest, Service Worker, Offline-Seite.
+        .merge(pwa::routes())
         .nest_service("/static", ServeDir::new("static"))
         .fallback(not_found)
         .layer(security_headers())

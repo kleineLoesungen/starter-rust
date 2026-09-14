@@ -1,0 +1,156 @@
+{#
+  Zeigt, was gerade gilt. Geaendert wird ueber Umgebungsvariablen — deshalb
+  steht neben jedem Wert der Name der Variablen, die ihn setzt.
+#}
+{% extends "layout/app.html" %}
+{% block title %}System{% endblock %}
+
+{% block main %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold tracking-tight">System</h1>
+  <p class="mt-1 max-w-2xl text-sm text-muted">
+    Die wirksame Konfiguration. Geändert wird sie über Umgebungsvariablen
+    (<code class="code">.env</code> bzw. <code class="code">compose.yaml</code>),
+    danach den Server neu starten.
+  </p>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-2">
+
+  {# --- App und PWA ------------------------------------------------------ #}
+  <section class="card h-fit">
+    <div class="card-header"><h2 class="card-title">App und Installation</h2></div>
+    <div class="card-body">
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm">
+        <dt class="text-muted">Name</dt>
+        <dd class="min-w-0">{{ brand.name }} <code class="code ml-1">APP_NAME</code></dd>
+
+        <dt class="text-muted">Kurzname</dt>
+        <dd class="min-w-0">{{ brand.short_name }} <code class="code ml-1">APP_SHORT_NAME</code></dd>
+
+        <dt class="text-muted">Leistenfarbe</dt>
+        <dd class="row gap-2">
+          <span class="size-4 rounded border border-border" style="background: {{ brand.theme_color }}"></span>
+          {{ brand.theme_color }} <code class="code">PWA_THEME_COLOR</code>
+        </dd>
+
+        <dt class="text-muted">Startbildschirm</dt>
+        <dd class="row gap-2">
+          <span class="size-4 rounded border border-border" style="background: {{ brand.background_color }}"></span>
+          {{ brand.background_color }} <code class="code">PWA_BACKGROUND_COLOR</code>
+        </dd>
+
+        <dt class="text-muted">Adresse</dt>
+        <dd class="min-w-0 break-all">{{ public_url }} <code class="code ml-1">PUBLIC_URL</code></dd>
+      </dl>
+
+      <div class="mt-5 row gap-3">
+        <img src="/static/icons/icon-192.png" alt="App-Icon" class="size-12 rounded-xl">
+        <p class="text-xs text-muted">
+          Icons liegen unter <code class="code">static/icons/</code>.
+          Quelle ändern in <code class="code">assets/icons/</code>, dann
+          <code class="code">./scripts/icons.sh</code>.
+        </p>
+      </div>
+
+      <p class="mt-4 text-xs text-subtle">
+        <a href="/manifest.webmanifest" class="hover:text-content">Manifest ansehen</a>
+      </p>
+    </div>
+  </section>
+
+  {# --- E-Mail ----------------------------------------------------------- #}
+  <section class="card h-fit">
+    <div class="card-header"><h2 class="card-title">E-Mail</h2></div>
+    <div class="card-body stack">
+
+      {% if sent %}
+        <div class="alert alert-success" role="status">Testmail wurde vom Mailserver angenommen.</div>
+      {% endif %}
+      {% if let Some(message) = error %}
+        <div class="alert alert-danger" role="alert">
+          <div>
+            <p class="font-medium">Versand fehlgeschlagen</p>
+            <p class="mt-1 break-words font-mono text-xs">{{ message }}</p>
+          </div>
+        </div>
+      {% endif %}
+
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm">
+        <dt class="text-muted">Versandweg</dt>
+        <dd class="min-w-0">{{ transport.kind }} <code class="code ml-1">SMTP_URL</code></dd>
+
+        {% if let Some(server) = transport.server %}
+          <dt class="text-muted">Server</dt>
+          <dd class="min-w-0 break-all">{{ server }}</dd>
+        {% endif %}
+
+        {% if let Some(tls) = transport.encryption %}
+          <dt class="text-muted">Verschlüsselung</dt>
+          <dd>{{ tls }}</dd>
+        {% endif %}
+
+        {% if let Some(benutzer) = transport.username %}
+          <dt class="text-muted">Anmeldung</dt>
+          <dd class="min-w-0 break-all">
+            {{ benutzer }}
+            {% if transport.has_password %}<span class="text-subtle">· Passwort gesetzt</span>{% endif %}
+          </dd>
+        {% endif %}
+
+        <dt class="text-muted">Absender</dt>
+        <dd class="min-w-0 break-all">{{ from_address }} <code class="code ml-1">MAIL_FROM</code></dd>
+      </dl>
+
+      {% if transport.server.is_none() %}
+        <div class="alert alert-warning">
+          Ohne <code class="code">SMTP_URL</code> wird nichts verschickt — Mails
+          erscheinen nur im Server-Log.
+        </div>
+      {% endif %}
+
+      <form method="post" action="/admin/system/testmail" class="stack border-t border-border pt-4">
+        <div class="field">
+          <label class="label" for="to">Testmail senden an</label>
+          <input class="input" type="email" id="to" name="to" value="{{ test_mail_to }}" required>
+        </div>
+        <button type="submit" class="btn btn-secondary">Testmail senden</button>
+      </form>
+    </div>
+  </section>
+
+  {# --- Sicherheit -------------------------------------------------------- #}
+  <section class="card h-fit">
+    <div class="card-header"><h2 class="card-title">Sicherheit</h2></div>
+    <div class="card-body">
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm">
+        <dt class="text-muted">Cookie nur über HTTPS</dt>
+        <dd>
+          {% if cookie_secure %}
+            <span class="badge badge-success">an</span>
+          {% else %}
+            <span class="badge badge-warning">aus</span>
+          {% endif %}
+          <code class="code ml-1">COOKIE_SECURE</code>
+        </dd>
+
+        <dt class="text-muted">Reverse-Proxy vertrauen</dt>
+        <dd>
+          {% if trust_proxy %}
+            <span class="badge badge-neutral">an</span>
+          {% else %}
+            <span class="badge badge-neutral">aus</span>
+          {% endif %}
+          <code class="code ml-1">TRUST_PROXY</code>
+        </dd>
+      </dl>
+      {% if !cookie_secure %}
+        <p class="mt-4 text-xs text-muted">
+          In Produktion mit HTTPS auf <code class="code">true</code> setzen.
+          Lokal ist <code class="code">false</code> richtig.
+        </p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

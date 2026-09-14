@@ -5,19 +5,19 @@
 #}
 {% extends "layout/app.html" %}
 {% import "components/macros.html" as ui %}
-{% block title %}{{ bearbeitet.display_name }}{% endblock %}
+{% block title %}{{ edited.display_name }}{% endblock %}
 
 {% block main %}
 <div class="mb-6">
   <a href="/admin/users" class="text-sm text-muted hover:text-content">← Alle Benutzer</a>
-  <h1 class="mt-2 text-2xl font-semibold tracking-tight">{{ bearbeitet.display_name }}</h1>
+  <h1 class="mt-2 text-2xl font-semibold tracking-tight">{{ edited.display_name }}</h1>
   <p class="mt-1 text-sm text-muted">
-    {{ bearbeitet.email }} · angelegt am
-    {% call ui::zeit_kurz(bearbeitet.created_at) %}{% endcall %}
+    {{ edited.email }} · angelegt am
+    {% call ui::date(edited.created_at) %}{% endcall %}
   </p>
 </div>
 
-{% if gespeichert %}
+{% if saved %}
   <div class="alert alert-success mb-6" role="status">Änderungen gespeichert.</div>
 {% endif %}
 
@@ -25,7 +25,7 @@
   <div class="alert alert-danger mb-6" role="alert">{{ message }}</div>
 {% endif %}
 
-{% if ist_letzter_admin %}
+{% if is_last_admin %}
   <div class="alert alert-info mb-6">
     <div>
       <p class="font-medium">Letzter aktiver Administrator</p>
@@ -42,42 +42,42 @@
   {# --- Stammdaten, Rolle, Status ---------------------------------------- #}
   <div class="card h-fit">
     <div class="card-header"><h2 class="card-title">Stammdaten</h2></div>
-    <form class="card-body stack" method="post" action="/admin/users/{{ bearbeitet.id }}">
+    <form class="card-body stack" method="post" action="/admin/users/{{ edited.id }}">
 
       <div class="field">
         <label class="label" for="display_name">Anzeigename</label>
         <input class="input" type="text" id="display_name" name="display_name"
-               value="{{ bearbeitet.display_name }}" required>
+               value="{{ edited.display_name }}" required>
       </div>
 
       <div class="field">
         <label class="label" for="email">E-Mail</label>
         <input class="input" type="email" id="email" name="email"
-               value="{{ bearbeitet.email }}" required>
+               value="{{ edited.email }}" required>
       </div>
 
       <div class="field">
         <label class="label" for="role">Rolle</label>
         <select class="select" id="role" name="role"
-                {% if ist_selbst %}disabled{% endif %}>
+                {% if is_self %}disabled{% endif %}>
           {% for role in roles %}
-            <option value="{{ role }}" {% if bearbeitet.role == *role %}selected{% endif %}>{{ role.label() }}</option>
+            <option value="{{ role }}" {% if edited.role == *role %}selected{% endif %}>{{ role.label() }}</option>
           {% endfor %}
         </select>
-        {% if ist_selbst %}
+        {% if is_self %}
           {# Gesperrte Felder senden nichts — Wert trotzdem mitschicken. #}
-          <input type="hidden" name="role" value="{{ bearbeitet.role }}">
+          <input type="hidden" name="role" value="{{ edited.role }}">
           <p class="hint">Die eigene Rolle lässt sich hier nicht ändern.</p>
         {% endif %}
       </div>
 
       <label class="row gap-2 text-sm">
         <input type="checkbox" class="checkbox" name="is_active" value="1"
-               {% if bearbeitet.is_active %}checked{% endif %}
-               {% if ist_selbst %}disabled{% endif %}>
+               {% if edited.is_active %}checked{% endif %}
+               {% if is_self %}disabled{% endif %}>
         Konto ist aktiv
       </label>
-      {% if ist_selbst %}
+      {% if is_self %}
         <input type="hidden" name="is_active" value="1">
         <p class="hint">Das eigene Konto lässt sich nicht sperren.</p>
       {% endif %}
@@ -91,7 +91,7 @@
     {# --- Passwort zurücksetzen ----------------------------------------- #}
     <div class="card">
       <div class="card-header"><h2 class="card-title">Passwort zurücksetzen</h2></div>
-      <form class="card-body stack" method="post" action="/admin/users/{{ bearbeitet.id }}/password">
+      <form class="card-body stack" method="post" action="/admin/users/{{ edited.id }}/password">
         <div class="field">
           <label class="label" for="password">Neues Passwort</label>
           <input class="input" type="password" id="password" name="password"
@@ -114,11 +114,11 @@
           Ausgestellte App-Tokens bleiben bestehen — sie gehören der Installation,
           nicht der Person.
         </p>
-        {% if ist_selbst %}
+        {% if is_self %}
           <p class="hint">Das eigene Konto lässt sich nicht löschen.</p>
         {% else %}
-          <form method="post" action="/admin/users/{{ bearbeitet.id }}/delete"
-                onsubmit="return confirm('Konto „{{ bearbeitet.display_name }}“ endgültig löschen?')">
+          <form method="post" action="/admin/users/{{ edited.id }}/delete"
+                onsubmit="return confirm('Konto „{{ edited.display_name }}“ endgültig löschen?')">
             <button type="submit" class="btn btn-danger">Konto löschen</button>
           </form>
         {% endif %}

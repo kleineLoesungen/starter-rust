@@ -16,10 +16,10 @@
     <div class="card-header"><h2 class="card-title">Profil</h2></div>
     <form class="card-body stack" method="post" action="/account">
 
-      {% if gespeichert == Some("profil") %}
+      {% if saved == Some("profile") %}
         <div class="alert alert-success" role="status">Profil gespeichert.</div>
       {% endif %}
-      {% if let Some(message) = profil_error %}
+      {% if let Some(message) = profile_error %}
         <div class="alert alert-danger" role="alert">{{ message }}</div>
       {% endif %}
 
@@ -45,10 +45,10 @@
     <div class="card-header"><h2 class="card-title">Passwort ändern</h2></div>
     <form class="card-body stack" method="post" action="/account/password">
 
-      {% if gespeichert == Some("passwort") %}
+      {% if saved == Some("password") %}
         <div class="alert alert-success" role="status">Passwort geändert.</div>
       {% endif %}
-      {% if let Some(message) = passwort_error %}
+      {% if let Some(message) = password_error %}
         <div class="alert alert-danger" role="alert">{{ message }}</div>
       {% endif %}
 

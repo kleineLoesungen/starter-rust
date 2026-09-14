@@ -1,6 +1,6 @@
 //! Ermitteln der Client-Adresse.
 //!
-//! Gebraucht wird sie fuer die Anmeldebremse in `domain::login_versuch`.
+//! Gebraucht wird sie fuer die Anmeldebremse in `domain::login_attempt`.
 //!
 //! Hinter einem Reverse-Proxy steht in der TCP-Verbindung nur der Proxy. Die
 //! echte Adresse liefert dann `X-Forwarded-For` — allerdings kann diesen Kopf
@@ -35,10 +35,10 @@ impl FromRequestParts<AppState> for ClientIp {
         // ConnectInfo liegt als Extension am Request — sie fehlt, wenn der
         // Server ohne `into_make_service_with_connect_info` gestartet wurde
         // (zum Beispiel in Tests).
-        let verbindung = parts.extensions.get::<ConnectInfo<SocketAddr>>();
-        Ok(ClientIp(ermitteln(
+        let connection = parts.extensions.get::<ConnectInfo<SocketAddr>>();
+        Ok(ClientIp(resolve(
             &parts.headers,
-            verbindung,
+            connection,
             state.config.trust_proxy,
         )))
     }
@@ -46,25 +46,25 @@ impl FromRequestParts<AppState> for ClientIp {
 
 /// Liefert die Adresse als Zeichenkette, oder `None`, wenn sie nicht zu
 /// ermitteln ist. `None` ist unkritisch: Dann greift nur die Bremse pro Konto.
-pub fn ermitteln(
+pub fn resolve(
     headers: &HeaderMap,
-    verbindung: Option<&ConnectInfo<SocketAddr>>,
+    connection: Option<&ConnectInfo<SocketAddr>>,
     trust_proxy: bool,
 ) -> Option<String> {
     if trust_proxy {
         // Der erste Eintrag ist der urspruengliche Client, danach folgen die Proxys.
-        if let Some(weitergeleitet) = headers
+        if let Some(forwarded) = headers
             .get("x-forwarded-for")
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.split(',').next())
             .map(str::trim)
             .filter(|v| !v.is_empty())
         {
-            return Some(weitergeleitet.to_string());
+            return Some(forwarded.to_string());
         }
     }
 
-    verbindung.map(|ConnectInfo(addr)| addr.ip().to_string())
+    connection.map(|ConnectInfo(addr)| addr.ip().to_string())
 }
 
 #[cfg(test)]
@@ -72,42 +72,42 @@ mod tests {
     use super::*;
     use axum::http::HeaderValue;
 
-    fn kopf(wert: &str) -> HeaderMap {
+    fn forwarded_header(value: &str) -> HeaderMap {
         let mut h = HeaderMap::new();
-        h.insert("x-forwarded-for", HeaderValue::from_str(wert).unwrap());
+        h.insert("x-forwarded-for", HeaderValue::from_str(value).unwrap());
         h
     }
 
-    fn verbindung(s: &str) -> ConnectInfo<SocketAddr> {
+    fn connection(s: &str) -> ConnectInfo<SocketAddr> {
         ConnectInfo(s.parse().unwrap())
     }
 
     #[test]
     fn ohne_proxy_zaehlt_die_verbindung() {
-        let v = verbindung("203.0.113.5:44321");
+        let v = connection("203.0.113.5:44321");
         // Selbst wenn jemand den Kopf mitschickt: ohne TRUST_PROXY zaehlt er nicht.
-        let ip = ermitteln(&kopf("1.2.3.4"), Some(&v), false);
+        let ip = resolve(&forwarded_header("1.2.3.4"), Some(&v), false);
         assert_eq!(ip.as_deref(), Some("203.0.113.5"));
     }
 
     #[test]
     fn mit_proxy_zaehlt_der_erste_eintrag() {
-        let v = verbindung("10.0.0.1:8080");
-        let ip = ermitteln(&kopf("203.0.113.5, 10.0.0.1"), Some(&v), true);
+        let v = connection("10.0.0.1:8080");
+        let ip = resolve(&forwarded_header("203.0.113.5, 10.0.0.1"), Some(&v), true);
         assert_eq!(ip.as_deref(), Some("203.0.113.5"));
     }
 
     #[test]
     fn ohne_kopf_faellt_es_auf_die_verbindung_zurueck() {
-        let v = verbindung("203.0.113.9:1234");
+        let v = connection("203.0.113.9:1234");
         assert_eq!(
-            ermitteln(&HeaderMap::new(), Some(&v), true).as_deref(),
+            resolve(&HeaderMap::new(), Some(&v), true).as_deref(),
             Some("203.0.113.9")
         );
     }
 
     #[test]
     fn ohne_alles_gibt_es_keine_adresse() {
-        assert_eq!(ermitteln(&HeaderMap::new(), None, true), None);
+        assert_eq!(resolve(&HeaderMap::new(), None, true), None);
     }
 }

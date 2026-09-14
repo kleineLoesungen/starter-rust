@@ -11,7 +11,7 @@ use tower_sessions::Session;
 
 use crate::auth::client_ip::ClientIp;
 use crate::auth::{Role, password, session};
-use crate::domain::{login_versuch, user};
+use crate::domain::{login_attempt, user};
 use crate::error::{Error, WebError};
 use crate::state::AppState;
 use crate::templates::{Layout, LoginPage, RegisterPage, render};
@@ -44,7 +44,7 @@ pub async fn login_page(
     render(LoginPage {
         layout: Layout::new("Anmelden", None, "/login"),
         error: None,
-        ersteinrichtung: ist_ersteinrichtung(&state).await?,
+        first_setup: is_first_setup(&state).await?,
         email: String::new(),
         next: safe_next(query.next.as_deref()),
     })
@@ -54,7 +54,7 @@ pub async fn login_page(
 ///
 /// Die Selbstregistrierung ist geschlossen: Sie dient nur dazu, den ersten
 /// Administrator anzulegen. Danach legt dieser alle weiteren Konten an.
-async fn ist_ersteinrichtung(state: &AppState) -> Result<bool, WebError> {
+async fn is_first_setup(state: &AppState) -> Result<bool, WebError> {
     Ok(user::count(&state.db).await? == 0)
 }
 
@@ -64,20 +64,20 @@ pub async fn login(
     ClientIp(ip): ClientIp,
     Form(form): Form<LoginForm>,
 ) -> Result<Response, WebError> {
-    let bremse = login_versuch::schluessel(&form.email, ip.as_deref());
+    let attempt_keys = login_attempt::keys(&form.email, ip.as_deref());
 
     // Erst die Bremse, dann das Passwort: Ein gesperrter Versuch soll den
     // Server keine Argon2-Rechenzeit kosten.
-    let gesperrt = login_versuch::pruefen(&state.db, &bremse).await;
+    let lock = login_attempt::check(&state.db, &attempt_keys).await;
 
-    let ergebnis = match gesperrt {
+    let result = match lock {
         Err(e) => Err(e),
         Ok(()) => user::authenticate(&state.db, &form.email, &form.password).await,
     };
 
-    match ergebnis {
+    match result {
         Ok(user) => {
-            login_versuch::erfolg(&state.db, &bremse).await?;
+            login_attempt::record_success(&state.db, &attempt_keys).await?;
             session::login(&session, user.id).await?;
             tracing::info!(user_id = %user.id, "Anmeldung erfolgreich");
             Ok(Redirect::to(&safe_next(Some(&form.next))).into_response())
@@ -86,31 +86,31 @@ pub async fn login(
             // Nur echte Fehlversuche zaehlen. Wer schon gesperrt ist, soll die
             // Sperre nicht durch stures Weiterklicken verlaengern koennen.
             let message = match err {
-                Error::TooManyRequests(sekunden) => {
+                Error::TooManyRequests(seconds) => {
                     tracing::warn!(email = %form.email, ip = ?ip, "Anmeldung gesperrt");
                     format!(
                         "Zu viele Fehlversuche. Bitte {} erneut versuchen.",
-                        wartetext(sekunden)
+                        wait_text(seconds)
                     )
                 }
                 Error::Forbidden => {
-                    login_versuch::fehlschlag(&state.db, &bremse).await?;
+                    login_attempt::record_failure(&state.db, &attempt_keys).await?;
                     "Dieses Konto ist gesperrt.".to_string()
                 }
                 Error::Unauthorized => {
-                    login_versuch::fehlschlag(&state.db, &bremse).await?;
+                    login_attempt::record_failure(&state.db, &attempt_keys).await?;
                     "E-Mail oder Passwort stimmt nicht.".to_string()
                 }
                 // Alles andere ist ein echter Fehler — Datenbank weg, Hashing
                 // kaputt. Den als "Passwort stimmt nicht" auszugeben, wuerde
                 // einen 500er als 401 tarnen und die Fehlersuche verhindern.
-                anderer => return Err(WebError(anderer)),
+                other => return Err(WebError(other)),
             };
 
             let body = render(LoginPage {
                 layout: Layout::new("Anmelden", None, "/login"),
                 error: Some(message),
-                ersteinrichtung: ist_ersteinrichtung(&state).await?,
+                first_setup: is_first_setup(&state).await?,
                 email: form.email,
                 next: safe_next(Some(&form.next)),
             })?;
@@ -121,19 +121,19 @@ pub async fn login(
 }
 
 /// Wartezeit so ausdruecken, wie ein Mensch sie liest.
-fn wartetext(sekunden: u64) -> String {
-    match sekunden {
-        0..=90 => format!("in {sekunden} Sekunden"),
+fn wait_text(seconds: u64) -> String {
+    match seconds {
+        0..=90 => format!("in {seconds} Sekunden"),
         s => {
-            let minuten = s.div_ceil(60);
-            format!("in {minuten} Minuten")
+            let minutes = s.div_ceil(60);
+            format!("in {minutes} Minuten")
         }
     }
 }
 
 pub async fn register_page(State(state): State<AppState>) -> Result<Response, WebError> {
-    if !ist_ersteinrichtung(&state).await? {
-        return Ok(geschlossen());
+    if !is_first_setup(&state).await? {
+        return Ok(registration_closed());
     }
 
     render(RegisterPage {
@@ -155,8 +155,8 @@ pub async fn register(
     //
     // Wichtig: Diese Pruefung steht HIER und nicht nur im Template. Sonst
     // liesse sich das Formular einfach von Hand abschicken.
-    if !ist_ersteinrichtung(&state).await? {
-        return Ok(geschlossen());
+    if !is_first_setup(&state).await? {
+        return Ok(registration_closed());
     }
 
     // Das erste Konto wird Administrator — sonst kaeme niemand an die
@@ -193,7 +193,7 @@ pub async fn register(
 
 /// Antwort, wenn die Selbstregistrierung geschlossen ist.
 /// Weiterleitung statt 404, damit ein alter Lesezeichen-Link sinnvoll landet.
-fn geschlossen() -> Response {
+fn registration_closed() -> Response {
     Redirect::to("/login").into_response()
 }
 

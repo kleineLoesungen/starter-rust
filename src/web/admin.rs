@@ -46,13 +46,13 @@ pub struct PasswordForm {
 #[derive(Debug, Deserialize)]
 pub struct DetailQuery {
     #[serde(default)]
-    pub gespeichert: Option<String>,
+    pub saved: Option<String>,
 }
 
 // --- Liste ------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
-pub struct SucheQuery {
+pub struct SearchQuery {
     /// Suchbegriff aus dem Formular. Leer bedeutet: alle anzeigen.
     #[serde(default)]
     pub q: String,
@@ -61,33 +61,33 @@ pub struct SucheQuery {
 pub async fn index(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
-    Query(query): Query<SucheQuery>,
+    Query(query): Query<SearchQuery>,
 ) -> Result<Response, WebError> {
-    liste(&state, admin, None, "", "", &query.q).await
+    render_list(&state, admin, None, "", "", &query.q).await
 }
 
 /// Rendert die Liste. Bei einem Fehler im Anlegen-Formular bleiben die
 /// Eingaben stehen, damit nichts neu getippt werden muss.
-async fn liste(
+async fn render_list(
     state: &AppState,
     admin: User,
     error: Option<String>,
-    neu_display_name: &str,
-    neu_email: &str,
-    suche: &str,
+    new_display_name: &str,
+    new_email: &str,
+    search: &str,
 ) -> Result<Response, WebError> {
-    let users = user::list(&state.db, Some(suche)).await?;
-    let gesamt = user::count(&state.db).await?;
+    let users = user::list(&state.db, Some(search)).await?;
+    let total = user::count(&state.db).await?;
     let current_user_id = admin.id;
 
     render(AdminUsersPage {
         layout: Layout::for_user("Benutzer", admin, "/admin/users"),
         users,
-        suche: suche.to_string(),
-        gesamt,
+        search: search.to_string(),
+        total,
         error,
-        neu_display_name: neu_display_name.to_string(),
-        neu_email: neu_email.to_string(),
+        new_display_name: new_display_name.to_string(),
+        new_email: new_email.to_string(),
         roles: Role::ALL.to_vec(),
         min_password_len: password::MIN_PASSWORD_LEN,
         current_user_id,
@@ -110,16 +110,13 @@ pub async fn create(
     )
     .await
     {
-        Ok(neu) => {
-            tracing::info!(by = %admin.id, user_id = %neu.id, %role, "Benutzer angelegt");
-            Ok(
-                Redirect::to(&format!("/admin/users/{}?gespeichert=angelegt", neu.id))
-                    .into_response(),
-            )
+        Ok(created) => {
+            tracing::info!(by = %admin.id, user_id = %created.id, %role, "Benutzer angelegt");
+            Ok(Redirect::to(&format!("/admin/users/{}?saved=created", created.id)).into_response())
         }
         Err(err) => {
             let status = err.status();
-            let body = liste(
+            let body = render_list(
                 &state,
                 admin,
                 Some(err.public_message()),
@@ -141,36 +138,36 @@ pub async fn show(
     Path(id): Path<Uuid>,
     Query(query): Query<DetailQuery>,
 ) -> Result<Response, WebError> {
-    detail(&state, admin, id, None, query.gespeichert.is_some()).await
+    render_detail(&state, admin, id, None, query.saved.is_some()).await
 }
 
-async fn detail(
+async fn render_detail(
     state: &AppState,
     admin: User,
     id: Uuid,
     error: Option<String>,
-    gespeichert: bool,
+    saved: bool,
 ) -> Result<Response, WebError> {
-    let bearbeitet = user::find_by_id(&state.db, id)
+    let edited = user::find_by_id(&state.db, id)
         .await?
         .ok_or(Error::NotFound)?;
 
     // Steuert, welche Bedienelemente die Seite sperrt. Die eigentliche
     // Absicherung liegt in der Domain-Schicht, nicht in dieser Anzeige.
-    let ist_selbst = bearbeitet.id == admin.id;
-    let ist_letzter_admin = bearbeitet.role == Role::Admin
-        && bearbeitet.is_active
+    let is_self = edited.id == admin.id;
+    let is_last_admin = edited.role == Role::Admin
+        && edited.is_active
         && user::count_active_admins(&state.db).await? <= 1;
 
     render(AdminUserPage {
-        layout: Layout::for_user(bearbeitet.display_name.clone(), admin, "/admin/users"),
-        bearbeitet,
+        layout: Layout::for_user(edited.display_name.clone(), admin, "/admin/users"),
+        edited,
         roles: Role::ALL.to_vec(),
         min_password_len: password::MIN_PASSWORD_LEN,
-        ist_selbst,
-        ist_letzter_admin,
+        is_self,
+        is_last_admin,
         error,
-        gespeichert,
+        saved,
     })
 }
 
@@ -181,33 +178,34 @@ pub async fn update(
     Form(form): Form<UpdateUserForm>,
 ) -> Result<Response, WebError> {
     let role: Role = form.role.parse()?;
-    let soll_aktiv = form.is_active.is_some();
+    let should_be_active = form.is_active.is_some();
 
-    match speichern(&state, &admin, id, &form, role, soll_aktiv).await {
+    match apply_changes(&state, &admin, id, &form, role, should_be_active).await {
         Ok(()) => {
-            tracing::info!(by = %admin.id, user_id = %id, %role, aktiv = soll_aktiv, "Benutzer geändert");
-            Ok(Redirect::to(&format!("/admin/users/{id}?gespeichert=1")).into_response())
+            tracing::info!(by = %admin.id, user_id = %id, %role, active = should_be_active, "Benutzer geändert");
+            Ok(Redirect::to(&format!("/admin/users/{id}?saved=1")).into_response())
         }
         Err(err) => {
             let status = err.0.status();
-            let body = detail(&state, admin, id, Some(err.0.public_message()), false).await?;
+            let body =
+                render_detail(&state, admin, id, Some(err.0.public_message()), false).await?;
             Ok((status, body).into_response())
         }
     }
 }
 
 /// Die drei Teiländerungen in einem Schritt — Stammdaten, Rolle, Status.
-async fn speichern(
+async fn apply_changes(
     state: &AppState,
     admin: &User,
     id: Uuid,
     form: &UpdateUserForm,
     role: Role,
-    soll_aktiv: bool,
+    should_be_active: bool,
 ) -> Result<(), WebError> {
     // Sonst koennte sich ein Administrator selbst degradieren oder aussperren
     // und danach nicht mehr an die Verwaltung kommen.
-    if id == admin.id && (role != Role::Admin || !soll_aktiv) {
+    if id == admin.id && (role != Role::Admin || !should_be_active) {
         return Err(WebError(Error::BadRequest(
             "Die eigene Rolle und der eigene Kontostatus lassen sich hier nicht ändern.".into(),
         )));
@@ -217,14 +215,14 @@ async fn speichern(
 
     // Reihenfolge beachtet: Erst degradieren, dann sperren. Beide Aufrufe
     // pruefen selbst, ob dadurch der letzte Administrator verschwaende.
-    let aktuell = user::find_by_id(&state.db, id)
+    let current = user::find_by_id(&state.db, id)
         .await?
         .ok_or(Error::NotFound)?;
-    if aktuell.role != role {
+    if current.role != role {
         user::set_role(&state.db, id, role).await?;
     }
-    if aktuell.is_active != soll_aktiv {
-        user::set_active(&state.db, id, soll_aktiv).await?;
+    if current.is_active != should_be_active {
+        user::set_active(&state.db, id, should_be_active).await?;
     }
     Ok(())
 }
@@ -238,11 +236,11 @@ pub async fn set_password(
     match user::change_password(&state.db, id, &form.password).await {
         Ok(()) => {
             tracing::info!(by = %admin.id, user_id = %id, "Passwort zurückgesetzt");
-            Ok(Redirect::to(&format!("/admin/users/{id}?gespeichert=passwort")).into_response())
+            Ok(Redirect::to(&format!("/admin/users/{id}?saved=password")).into_response())
         }
         Err(err) => {
             let status = err.status();
-            let body = detail(&state, admin, id, Some(err.public_message()), false).await?;
+            let body = render_detail(&state, admin, id, Some(err.public_message()), false).await?;
             Ok((status, body).into_response())
         }
     }
@@ -254,7 +252,7 @@ pub async fn delete(
     Path(id): Path<Uuid>,
 ) -> Result<Response, WebError> {
     if id == admin.id {
-        let body = detail(
+        let body = render_detail(
             &state,
             admin,
             id,
@@ -272,7 +270,7 @@ pub async fn delete(
         }
         Err(err) => {
             let status = err.status();
-            let body = detail(&state, admin, id, Some(err.public_message()), false).await?;
+            let body = render_detail(&state, admin, id, Some(err.public_message()), false).await?;
             Ok((status, body).into_response())
         }
     }

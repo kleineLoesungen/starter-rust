@@ -44,13 +44,27 @@ Beispielen im Netz stammt, funktioniert hier oft nicht:
    Builder-Struct mit `Default` und `execute()` — umständlich und schlecht
    merkbar. Stattdessen Methoden benutzen:
    ```jinja
-   {{ note.created_at.datum() }}      ✅  (Trait DatumAnzeige in templates.rs)
-   {{ note.created_at|datum }}        ❌
+   {{ user.role.label() }}            ✅  Methode am Typ
+   {{ user.role|label }}              ❌  eigener Filter
    ```
+   Für Zeitstempel gibt es fertige Makros, siehe unten unter „Aussehen ändern".
 
 3. **Templates werden zur Compile-Zeit geprüft.** Ein Tippfehler im Feldnamen
    bricht `cargo build`. Das ist gewollt — nach jeder Template-Änderung
    `cargo check` laufen lassen.
+
+---
+
+## Sprache im Code
+
+* **Bezeichner englisch** — Funktionen, Typen, Felder öffentlicher
+  Schnittstellen: `Mail::to(..).subject(..)`, `mailer.send(..)`,
+  `Mailer::in_memory()`. So heißen sie auch in den Crates, und so rät man sie.
+* **Kommentare, Doku, Oberflächentexte, Testnamen deutsch.**
+
+Dazu gehören auch Datenbanktabellen und -spalten, Template-Felder, Makros,
+HTML-IDs, CSS-Klassen, `data`-Attribute, Formularfelder, Query-Parameter und
+JavaScript. Lokale Variablen dürfen deutsch sein, im Zweifel englisch.
 
 ---
 
@@ -126,7 +140,7 @@ Ausführungen, und der Unterschied ist sicherheitsrelevant.
 
 Drei Fehlversuche sind frei, danach greift eine Sperre, die mit jedem weiteren
 Fehlversuch wächst (5 s → 15 s → 45 s → … → 15 min). Gezählt wird gleichzeitig
-pro Konto und pro IP-Adresse; siehe `src/domain/login_versuch.rs`.
+pro Konto und pro IP-Adresse; siehe `src/domain/login_attempt.rs`.
 
 Zwei Dinge dabei nicht kaputtmachen:
 
@@ -138,6 +152,36 @@ Zwei Dinge dabei nicht kaputtmachen:
 Hinter einem Reverse-Proxy muss `TRUST_PROXY=true` gesetzt sein, sonst zählen
 alle Anfragen auf die Adresse des Proxys. Ohne Proxy muss es `false` bleiben —
 sonst kann sich jeder Client per `X-Forwarded-For` eine neue Identität geben.
+
+---
+
+## E-Mail
+
+```rust
+state.mailer.send(Mail::to(&adresse).subject("…").text("…")).await?;   // wartet
+state.mailer.send_in_background(mail);                               // wartet nicht
+```
+
+* Immer eine Textfassung mitgeben, HTML nur zusätzlich über `.template(&vorlage)?`.
+* Mail-Templates unter `templates/mail/`, erben von `mail/base.html`,
+  **nur Inline-Styles** — keine Tailwind-Klassen.
+* In Tests `Mailer::in_memory()` und `app::build_with_mailer` benutzen, nie
+  echten SMTP.
+* Rezept: [docs/RECIPES.md](docs/RECIPES.md#12-eine-e-mail-verschicken).
+
+---
+
+## PWA: Der Service Worker speichert keine Seiten
+
+`src/pwa.rs` liefert Manifest, Service Worker und Offline-Seite. Der Worker
+speichert nur `/static/…` zwischen. **Keine Seiten, keine API, keine
+htmx-Fragmente in den Cache aufnehmen** — die Anwendung ist angemeldet und
+serverseitig gerendert. Eine gecachte Seite zeigt veraltete Daten oder nach dem
+Abmelden die Inhalte des vorherigen Benutzers.
+
+Name, Kurzname und Farben kommen aus `APP_NAME`, `APP_SHORT_NAME`,
+`PWA_THEME_COLOR`, `PWA_BACKGROUND_COLOR`. In Templates über `layout.app_name`,
+in Rust über `templates::branding()`.
 
 ---
 
@@ -226,8 +270,8 @@ Zwei Dinge, die auf schmalen Bildschirmen regelmäßig schiefgehen:
   ergänzen. Es wird zweimal aufgerufen — Kopfzeile (breit) und Blatt hinter
   „Mehr" (schmal). Die untere Leiste auf dem Telefon ist eine handverlesene
   Abkürzung und bleibt bewusst separat.
-* **Zeitstempel nur über die Makros `ui::zeit` / `ui::zeit_kurz`** ausgeben.
-  `{{ wert.datum() }}` direkt im Template liefert UTC statt Ortszeit — im
+* **Zeitstempel nur über die Makros `ui::datetime` / `ui::date`** ausgeben.
+  `{{ value.date_time() }}` direkt im Template liefert UTC statt Ortszeit — im
   Sommer zwei Stunden daneben.
 
 ---
@@ -239,6 +283,9 @@ just check     # Formatierung, Clippy (streng), alle Tests
 ```
 
 Bei Template- oder CSS-Änderungen zusätzlich `just css`.
+Nach einer Änderung an `assets/icons/*.svg` zusätzlich `./scripts/icons.sh`.
+Wer `--brand-hue` in `theme.css` ändert, zieht `PWA_THEME_COLOR` und die
+Icon-Farbe nach — siehe [docs/DESIGN.md](docs/DESIGN.md#1-der-schnellste-weg-eine-zahl).
 
 ---
 
@@ -262,3 +309,7 @@ lesen, statt ein eigenes Muster zu erfinden.
 - `/register` wieder öffnen, ohne die Prüfung im Handler mitzudenken.
 - Rohe Tailwind-Farben (`bg-blue-500`) statt semantischer Tokens.
 - Geheimnisse in den Quellcode. Alles kommt aus `Config::from_env()`.
+- HTML per `format!` zusammensetzen, ohne Eingaben mit `html_escape` zu
+  behandeln. Askama maskiert automatisch — Handarbeit nicht (siehe
+  `render_error_page`, dort gab es genau diesen Fehler).
+- In `.env` Werte mit Leerzeichen oder `< >` ohne Anführungszeichen.

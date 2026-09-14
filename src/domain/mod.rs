@@ -6,6 +6,6 @@
 //! stattdessen nach `src/web/` oder `src/api/`.
 
 pub mod api_token;
-pub mod login_versuch;
+pub mod login_attempt;
 pub mod note;
 pub mod user;

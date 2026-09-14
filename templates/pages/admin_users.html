@@ -24,13 +24,13 @@
       <div class="field">
         <label class="label" for="display_name">Anzeigename</label>
         <input class="input" type="text" id="display_name" name="display_name"
-               value="{{ neu_display_name }}" required>
+               value="{{ new_display_name }}" required>
       </div>
 
       <div class="field">
         <label class="label" for="email">E-Mail</label>
         <input class="input" type="email" id="email" name="email"
-               value="{{ neu_email }}" required>
+               value="{{ new_email }}" required>
       </div>
 
       <div class="field">
@@ -64,24 +64,24 @@
       laesst sich damit als Lesezeichen speichern und weitergeben.
     #}
     <form method="get" action="/admin/users" class="mb-4 flex gap-2">
-      <input class="input" type="search" name="q" value="{{ suche }}"
+      <input class="input" type="search" name="q" value="{{ search }}"
              placeholder="Name oder E-Mail suchen" aria-label="Benutzer suchen">
       <button type="submit" class="btn btn-secondary shrink-0">Suchen</button>
-      {% if !suche.is_empty() %}
+      {% if !search.is_empty() %}
         <a href="/admin/users" class="btn btn-ghost shrink-0">Zurücksetzen</a>
       {% endif %}
     </form>
 
-    {% if !suche.is_empty() %}
+    {% if !search.is_empty() %}
       <p class="mb-3 text-sm text-muted">
-        {{ users.len() }} von {{ gesamt }} Konten passen zu „{{ suche }}“.
+        {{ users.len() }} von {{ total }} Konten passen zu „{{ search }}“.
       </p>
     {% endif %}
 
     {% if users.is_empty() %}
       <div class="empty">
         <p class="empty-title">Kein Treffer</p>
-        <p class="empty-hint">Für „{{ suche }}“ gibt es kein Konto.</p>
+        <p class="empty-hint">Für „{{ search }}“ gibt es kein Konto.</p>
       </div>
     {% else %}
     <div class="table-wrap">
@@ -113,7 +113,7 @@
               <span class="badge badge-danger">gesperrt</span>
             {% endif %}
           </td>
-          <td class="text-muted">{% call ui::zeit_kurz(u.created_at) %}{% endcall %}</td>
+          <td class="text-muted">{% call ui::date(u.created_at) %}{% endcall %}</td>
           <td class="text-right">
             <a href="/admin/users/{{ u.id }}" class="btn btn-ghost btn-sm">Bearbeiten</a>
           </td>

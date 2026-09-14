@@ -133,11 +133,11 @@ pub async fn find_by_email(db: &PgPool, email: &str) -> Result<Option<User>, Err
 /// gedacht ist, kostet ein vollstaendiger Durchlauf nichts. Wird die Liste
 /// wirklich lang, gehoert hier `LIMIT`/`OFFSET` dazu — und in die Oberflaeche
 /// eine Blaetterleiste.
-pub async fn list(db: &PgPool, suche: Option<&str>) -> Result<Vec<User>, Error> {
-    let muster = suche
+pub async fn list(db: &PgPool, search: Option<&str>) -> Result<Vec<User>, Error> {
+    let pattern = search
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map(|s| format!("%{}%", maskieren(s)));
+        .map(|s| format!("%{}%", escape_like(s)));
 
     let users = sqlx::query_as::<_, User>(&format!(
         r#"SELECT {COLUMNS} FROM users
@@ -146,7 +146,7 @@ pub async fn list(db: &PgPool, suche: Option<&str>) -> Result<Vec<User>, Error> 
               OR email ILIKE $1
            ORDER BY created_at DESC"#
     ))
-    .bind(muster)
+    .bind(pattern)
     .fetch_all(db)
     .await?;
     Ok(users)
@@ -157,8 +157,8 @@ pub async fn list(db: &PgPool, suche: Option<&str>) -> Result<Vec<User>, Error> 
 ///
 /// Eine ESCAPE-Klausel braucht die Abfrage dafuer nicht: In PostgreSQL ist der
 /// Rueckstrich schon das voreingestellte Maskierzeichen von LIKE.
-fn maskieren(eingabe: &str) -> String {
-    eingabe
+fn escape_like(input: &str) -> String {
+    input
         .replace('\\', "\\\\")
         .replace('%', "\\%")
         .replace('_', "\\_")

@@ -30,34 +30,34 @@ pub struct PasswordForm {
 #[derive(Debug, Deserialize)]
 pub struct AccountQuery {
     #[serde(default)]
-    pub gespeichert: Option<String>,
+    pub saved: Option<String>,
 }
 
 pub async fn show(
     CurrentUser(user): CurrentUser,
     Query(query): Query<AccountQuery>,
 ) -> Result<Response, WebError> {
-    let gespeichert = match query.gespeichert.as_deref() {
-        Some("profil") => Some("profil"),
-        Some("passwort") => Some("passwort"),
+    let saved = match query.saved.as_deref() {
+        Some("profile") => Some("profile"),
+        Some("password") => Some("password"),
         _ => None,
     };
-    seite(user, None, None, gespeichert)
+    render_page(user, None, None, saved)
 }
 
-fn seite(
+fn render_page(
     user: User,
-    profil_error: Option<String>,
-    passwort_error: Option<String>,
-    gespeichert: Option<&'static str>,
+    profile_error: Option<String>,
+    password_error: Option<String>,
+    saved: Option<&'static str>,
 ) -> Result<Response, WebError> {
     render(AccountPage {
         layout: Layout::for_user("Mein Konto", user.clone(), "/account"),
         user,
         min_password_len: password::MIN_PASSWORD_LEN,
-        profil_error,
-        passwort_error,
-        gespeichert,
+        profile_error,
+        password_error,
+        saved,
     })
 }
 
@@ -67,16 +67,16 @@ pub async fn update_profile(
     Form(form): Form<ProfileForm>,
 ) -> Result<Response, WebError> {
     match user::update_profile(&state.db, user.id, &form.display_name, &form.email).await {
-        Ok(_) => Ok(Redirect::to("/account?gespeichert=profil").into_response()),
+        Ok(_) => Ok(Redirect::to("/account?saved=profile").into_response()),
         Err(err) => {
             let status = err.status();
             // Die abgelehnten Eingaben stehen lassen, damit nichts verlorengeht.
-            let mit_eingabe = User {
+            let with_input = User {
                 display_name: form.display_name,
                 email: form.email,
                 ..user
             };
-            let body = seite(mit_eingabe, Some(err.public_message()), None, None)?;
+            let body = render_page(with_input, Some(err.public_message()), None, None)?;
             Ok((status, body).into_response())
         }
     }
@@ -87,29 +87,29 @@ pub async fn change_password(
     CurrentUser(user): CurrentUser,
     Form(form): Form<PasswordForm>,
 ) -> Result<Response, WebError> {
-    match passwort_wechseln(&state, &user, &form).await {
+    match verify_and_change_password(&state, &user, &form).await {
         Ok(()) => {
             tracing::info!(user_id = %user.id, "Passwort geändert");
-            Ok(Redirect::to("/account?gespeichert=passwort").into_response())
+            Ok(Redirect::to("/account?saved=password").into_response())
         }
         Err(err) => {
             let status = err.status();
-            let body = seite(user, None, Some(err.public_message()), None)?;
+            let body = render_page(user, None, Some(err.public_message()), None)?;
             Ok((status, body).into_response())
         }
     }
 }
 
-async fn passwort_wechseln(
+async fn verify_and_change_password(
     state: &AppState,
     user: &User,
     form: &PasswordForm,
 ) -> Result<(), Error> {
     // Das aktuelle Passwort abfragen, damit ein unbeaufsichtigter Rechner
     // nicht reicht, um das Konto zu uebernehmen.
-    let stimmt =
+    let matches =
         password::verify(form.current_password.clone(), user.password_hash.clone()).await?;
-    if !stimmt {
+    if !matches {
         return Err(Error::BadRequest(
             "Das aktuelle Passwort stimmt nicht.".into(),
         ));

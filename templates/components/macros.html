@@ -18,12 +18,12 @@
   Ortszeit des Betrachters — das erledigt auch die Sommerzeit und stimmt fuer
   Leute in anderen Zeitzonen.
 #}
-{% macro zeit(wert) %}
-<time datetime="{{ wert.iso() }}" data-zeit="lang">{{ wert.datum() }}</time>
+{% macro datetime(value) %}
+<time datetime="{{ value.iso() }}" data-time="long">{{ value.date_time() }}</time>
 {% endmacro %}
 
-{% macro zeit_kurz(wert) %}
-<time datetime="{{ wert.iso() }}" data-zeit="kurz">{{ wert.datum_kurz() }}</time>
+{% macro date(value) %}
+<time datetime="{{ value.iso() }}" data-time="short">{{ value.date() }}</time>
 {% endmacro %}
 
 {% macro note_item(note) %}
@@ -37,7 +37,7 @@
         <p class="mt-1 line-clamp-3 text-sm whitespace-pre-line text-muted">{{ note.body }}</p>
       {% endif %}
       <p class="mt-2 text-xs text-subtle">
-        Angelegt am {% call zeit(note.created_at) %}{% endcall %}
+        Angelegt am {% call datetime(note.created_at) %}{% endcall %}
       </p>
     </div>
 
@@ -78,7 +78,7 @@
   </td>
   <td class="text-muted">
     {% match token.last_used_at %}
-      {% when Some with (t) %}{% call zeit(t) %}{% endcall %}
+      {% when Some with (t) %}{% call datetime(t) %}{% endcall %}
       {% when None %}<span class="text-subtle">nie</span>
     {% endmatch %}
   </td>

@@ -30,6 +30,17 @@ services:
       timeout: 3s
       retries: 10
 
+  mail:
+    # Mailpit nimmt jede Mail an und verschickt NICHTS. Die Mails erscheinen
+    # in einer Weboberflaeche — zum Ansehen von Layout und Links, ohne dass
+    # beim Testen versehentlich echte Adressen etwas bekommen.
+    image: axllent/mailpit:latest
+    ports:
+      # Eigene Ports statt 1025/8025, damit ein Mailpit aus einem anderen
+      # Projekt nicht kollidiert.
+      - "51025:1025"   # SMTP
+      - "58025:8025"   # Weboberflaeche: http://localhost:58025
+
   app:
     # Nur mit `--profile app`, damit `just db-up` nicht die ganze Anwendung baut.
     profiles: ["app"]
@@ -43,9 +54,14 @@ services:
       PUBLIC_URL: http://localhost:3000
       COOKIE_SECURE: "false"
       RUST_LOG: starter=info
+      # Im Container-Netz heisst Mailpit "mail".
+      SMTP_URL: smtp://mail:1025
+      MAIL_FROM: Starter <noreply@localhost>
     depends_on:
       db:
         condition: service_healthy
+      mail:
+        condition: service_started
 
 volumes:
   db-data:

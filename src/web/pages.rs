@@ -20,10 +20,10 @@ pub async fn landing(
         return Ok(Redirect::to("/dashboard").into_response());
     }
     // Solange kein Konto existiert, fuehrt die Startseite zur Ersteinrichtung.
-    let ersteinrichtung = user::count(&state.db).await? == 0;
+    let first_setup = user::count(&state.db).await? == 0;
     render(LandingPage {
         layout: Layout::new("Start", user, "/"),
-        ersteinrichtung,
+        first_setup,
     })
 }
 

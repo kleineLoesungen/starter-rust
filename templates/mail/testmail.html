@@ -1,0 +1,17 @@
+{% extends "mail/base.html" %}
+{% block subject %}Testmail{% endblock %}
+
+{% block content %}
+<p style="margin:0 0 16px;">Hallo {{ recipient_name }},</p>
+<p style="margin:0 0 16px;">
+  diese Testmail bestätigt, dass der E-Mail-Versand von {{ brand.name }}
+  funktioniert.
+</p>
+<p style="margin:0 0 24px;">
+  <a href="{{ link }}"
+     style="display:inline-block;padding:10px 18px;border-radius:8px;background:{{ brand.theme_color }};color:#ffffff;text-decoration:none;font-weight:600;">
+    Zur Anwendung
+  </a>
+</p>
+<p style="margin:0;font-size:13px;color:#7a8194;">Ausgelöst von {{ triggered_by }}.</p>
+{% endblock %}

@@ -23,14 +23,34 @@ use crate::auth::Role;
 use crate::domain::user::User;
 use crate::error::{Error, WebError};
 
-/// Name der Anwendung. Erscheint in Titelzeile und Kopfbereich.
-pub const APP_NAME: &str = "Starter";
+/// Name, Farben und Kurzname der Anwendung — aus `APP_NAME`, `PWA_THEME_COLOR` usw.
+///
+/// Warum eine einmal gesetzte globale Ablage und kein Feld im `AppState`?
+/// `Layout::new` wird in jedem Handler aufgerufen, auch in solchen, die den
+/// Zustand sonst gar nicht brauchen. Den Namen ueberall durchzureichen waere
+/// viel Rauschen fuer einen Wert, der sich zur Laufzeit nie aendert.
+/// Gesetzt wird er genau einmal in `app::build`; vorher gilt die Vorgabe.
+static BRANDING: std::sync::OnceLock<crate::config::Branding> = std::sync::OnceLock::new();
+
+pub fn set_branding(branding: crate::config::Branding) {
+    // Ein zweiter Aufruf (etwa in Tests) wird ignoriert — der Wert ist dann
+    // ohnehin derselbe.
+    let _ = BRANDING.set(branding);
+}
+
+pub fn branding() -> &'static crate::config::Branding {
+    BRANDING.get_or_init(crate::config::Branding::default)
+}
 
 /// Daten, die jede Seite im Rahmen braucht: Titel, angemeldeter Benutzer,
 /// aktueller Pfad fuer die Navigationsmarkierung.
 pub struct Layout {
     pub title: String,
     pub app_name: &'static str,
+    /// Farbe fuer Browserleiste und installierte App.
+    pub theme_color: &'static str,
+    /// Name unter dem Icon auf dem Startbildschirm.
+    pub app_short_name: &'static str,
     pub user: Option<User>,
     pub path: String,
 }
@@ -39,7 +59,9 @@ impl Layout {
     pub fn new(title: impl Into<String>, user: Option<User>, path: impl Into<String>) -> Self {
         Self {
             title: title.into(),
-            app_name: APP_NAME,
+            app_name: &branding().name,
+            theme_color: &branding().theme_color,
+            app_short_name: &branding().short_name,
             user,
             path: path.into(),
         }
@@ -103,38 +125,38 @@ impl Toast {
 
 /// Datumsformatierung fuer Templates.
 ///
-/// ACHTUNG: `datum()` und `datum_kurz()` formatieren in der Zeitzone des Wertes.
+/// ACHTUNG: `date_time()` und `date()` formatieren in der Zeitzone des Wertes.
 /// Aus der Datenbank kommen alle Zeitstempel in UTC — die Ausgabe ist damit
 /// UTC, nicht Ortszeit. Im Sommer sind das zwei Stunden Unterschied zu Berlin.
 /// Deshalb rendern die Templates sie nicht direkt, sondern ueber das Makro
-/// `zeit()`, das die Umrechnung dem Browser ueberlaesst. Diese Methoden sind
+/// `datetime()`, das die Umrechnung dem Browser ueberlaesst. Diese Methoden sind
 /// nur noch der Rueckfall, wenn kein JavaScript laeuft.
 ///
 /// Bewusst als Trait mit Methoden statt als Askama-Filter: Filter haben in
 /// Askama 0.16 eine eigenwillige Builder-Schnittstelle, Methodenaufrufe sind
 /// dagegen gewoehnliches Rust und im Template sofort verstaendlich.
 ///
-/// Im Template: `{{ note.created_at.datum() }}`
-pub trait DatumAnzeige {
+/// Im Template: `{{ note.created_at.date_time() }}`
+pub trait DateDisplay {
     /// Datum und Uhrzeit: 09.09.2026, 14:30
-    fn datum(&self) -> String;
+    fn date_time(&self) -> String;
     /// Nur das Datum: 09.09.2026
-    fn datum_kurz(&self) -> String;
+    fn date(&self) -> String;
     /// Maschinenlesbar nach RFC 3339, immer in UTC.
     ///
     /// Gehoert in das `datetime`-Attribut eines `<time>`-Elements. Der Browser
-    /// rechnet daraus die Ortszeit des Betrachters aus — siehe `zeit()` in
+    /// rechnet daraus die Ortszeit des Betrachters aus — siehe `datetime()` in
     /// `templates/components/macros.html`.
     fn iso(&self) -> String;
 }
 
-impl DatumAnzeige for time::OffsetDateTime {
-    fn datum(&self) -> String {
+impl DateDisplay for time::OffsetDateTime {
+    fn date_time(&self) -> String {
         let fmt = time::macros::format_description!("[day].[month].[year], [hour]:[minute]");
         self.format(&fmt).unwrap_or_else(|_| "—".into())
     }
 
-    fn datum_kurz(&self) -> String {
+    fn date(&self) -> String {
         let fmt = time::macros::format_description!("[day].[month].[year]");
         self.format(&fmt).unwrap_or_else(|_| "—".into())
     }
@@ -159,13 +181,18 @@ pub fn render<T: Template>(template: T) -> Result<Response, WebError> {
 /// Ursache ist, darf die Fehlerseite nicht am selben Problem scheitern.
 pub fn render_error_page(status: StatusCode, message: &str) -> String {
     let code = status.as_u16();
+    // Diese Seite entsteht per format! statt ueber Askama — also gibt es auch
+    // KEIN automatisches Maskieren. Meldungen koennen Benutzereingaben enthalten
+    // ("Unbekannte Rolle: …"); ohne diese beiden Zeilen waere das ein XSS.
+    let name = html_escape(&branding().name);
+    let message = html_escape(message);
     format!(
         r##"<!doctype html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{code} · {APP_NAME}</title>
+<title>{code} · {name}</title>
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body class="min-h-dvh bg-surface text-content">
@@ -177,6 +204,24 @@ pub fn render_error_page(status: StatusCode, message: &str) -> String {
 </body>
 </html>"##
     )
+}
+
+/// Maskiert die fuenf in HTML bedeutsamen Zeichen.
+/// Nur fuer Stellen, an denen HTML von Hand zusammengesetzt wird — in
+/// Askama-Templates erledigt das die Template-Engine selbst.
+pub fn html_escape(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    for character in input.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '"' => output.push_str("&quot;"),
+            '\'' => output.push_str("&#39;"),
+            other => output.push(other),
+        }
+    }
+    output
 }
 
 // ============================================================================
@@ -197,7 +242,7 @@ pub struct LandingPage {
     pub layout: Layout,
     /// Nur waehrend der Ersteinrichtung wahr — danach legt der Administrator
     /// alle Konten an.
-    pub ersteinrichtung: bool,
+    pub first_setup: bool,
 }
 
 #[derive(Template)]
@@ -206,7 +251,7 @@ pub struct LoginPage {
     pub layout: Layout,
     pub error: Option<String>,
     /// Zeigt den Hinweis auf die Ersteinrichtung nur, solange es kein Konto gibt.
-    pub ersteinrichtung: bool,
+    pub first_setup: bool,
     /// Eingegebene Adresse bleibt nach einem Fehlversuch stehen.
     pub email: String,
     /// Ziel nach erfolgreicher Anmeldung.
@@ -272,14 +317,14 @@ pub struct AdminUsersPage {
     pub layout: Layout,
     pub users: Vec<User>,
     /// Aktueller Suchbegriff — bleibt im Feld stehen.
-    pub suche: String,
+    pub search: String,
     /// Gesamtzahl aller Konten, damit erkennbar ist, dass gefiltert wird.
-    pub gesamt: i64,
+    pub total: i64,
     /// Fehler aus dem Anlegen-Formular.
     pub error: Option<String>,
     /// Eingaben bleiben nach einem Fehlversuch stehen.
-    pub neu_display_name: String,
-    pub neu_email: String,
+    pub new_display_name: String,
+    pub new_email: String,
     pub roles: Vec<Role>,
     pub min_password_len: usize,
     pub current_user_id: Uuid,
@@ -291,15 +336,15 @@ pub struct AdminUsersPage {
 pub struct AdminUserPage {
     pub layout: Layout,
     /// Der bearbeitete Benutzer — nicht der angemeldete Administrator.
-    pub bearbeitet: User,
+    pub edited: User,
     pub roles: Vec<Role>,
     pub min_password_len: usize,
     /// `true`, wenn der Administrator sich gerade selbst ansieht.
-    pub ist_selbst: bool,
+    pub is_self: bool,
     /// `true`, wenn dieses Konto der letzte aktive Administrator ist.
-    pub ist_letzter_admin: bool,
+    pub is_last_admin: bool,
     pub error: Option<String>,
-    pub gespeichert: bool,
+    pub saved: bool,
 }
 
 /// Eigene Kontoseite. Fuer jeden angemeldeten Benutzer, unabhaengig von der Rolle.
@@ -309,10 +354,34 @@ pub struct AccountPage {
     pub layout: Layout,
     pub user: User,
     pub min_password_len: usize,
-    pub profil_error: Option<String>,
-    pub passwort_error: Option<String>,
+    pub profile_error: Option<String>,
+    pub password_error: Option<String>,
     /// Welcher Abschnitt gerade erfolgreich gespeichert wurde.
-    pub gespeichert: Option<&'static str>,
+    pub saved: Option<&'static str>,
+}
+
+/// Systemseite: wirksame Konfiguration und Testmail.
+#[derive(Template)]
+#[template(path = "pages/admin_system.html")]
+pub struct SystemPage {
+    pub layout: Layout,
+    pub brand: crate::config::Branding,
+    pub public_url: String,
+    pub cookie_secure: bool,
+    pub trust_proxy: bool,
+    pub transport: crate::mail::TransportInfo,
+    pub from_address: String,
+    /// Vorbelegung des Empfaengerfelds.
+    pub test_mail_to: String,
+    pub sent: bool,
+    pub error: Option<String>,
+}
+
+/// Seite fuer den Fall ohne Netz. Wird vom Service Worker vorgehalten.
+#[derive(Template)]
+#[template(path = "pages/offline.html")]
+pub struct OfflinePage {
+    pub layout: Layout,
 }
 
 #[derive(Template)]

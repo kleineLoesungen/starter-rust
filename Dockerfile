@@ -62,6 +62,8 @@ WORKDIR /app
 COPY --from=build /build/target/release/starter /usr/local/bin/starter
 COPY --from=css   /out/app.css                  /app/static/app.css
 COPY static/htmx.min.js static/favicon.svg      /app/static/
+# Icons fuer die installierbare App — ohne sie verweist das Manifest ins Leere.
+COPY static/icons/                              /app/static/icons/
 
 USER app
 EXPOSE 3000

@@ -16,6 +16,8 @@ setup:
     ./scripts/get-tailwind.sh
     [ -f .env ] || cp .env.example .env
     just db-up
+    just mail-up
+    ./scripts/icons.sh >/dev/null 2>&1 || true
     just css
     @echo ""
     @echo "Fertig. Weiter mit:  just dev"
@@ -49,6 +51,11 @@ db-up:
 
 db-down:
     docker compose down
+
+# Mailpit starten: faengt alle Mails ab, Ansicht unter http://localhost:58025
+mail-up:
+    docker compose up -d mail
+    @echo "Mailpit läuft: http://localhost:58025"
 
 # ACHTUNG: loescht alle lokalen Daten und legt die Datenbank neu an.
 db-reset:

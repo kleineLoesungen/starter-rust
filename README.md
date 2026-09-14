@@ -53,11 +53,13 @@ cargo run
 | Eigenes Konto | Name, E-Mail und Passwort selbst ändern |
 | API | JSON unter `/api/v1` für Maschinen, Zugriff über Scopes |
 | CSRF | SameSite-Cookie plus Herkunftsprüfung |
-| Mobil | Navigationsleiste unten, „Mehr"-Blatt, kein waagerechtes Scrollen |
+| Mobil | unter 1024 px Navigationsleiste unten, „Mehr"-Blatt, kein waagerechtes Scrollen |
 | Anmeldeschutz | 3 Versuche frei, danach wachsende Sperre pro Konto und IP |
 | Zeitangaben | in UTC gespeichert, in der Ortszeit des Betrachters angezeigt |
+| Installierbar | PWA mit Manifest, Icons und Offline-Seite; Name und Farben per Umgebung |
+| E-Mail | SMTP per `SMTP_URL`, lokal Mailpit, Testmail unter **System** |
 | Container | Mehrstufiges Dockerfile, unprivilegierter Benutzer |
-| Tests | 77 Tests, jeder mit eigener frischer Datenbank |
+| Tests | 91 Tests, jeder mit eigener frischer Datenbank |
 
 ---
 
@@ -69,33 +71,47 @@ src/
 ├── app.rs              Zusammenbau des Routers (auch von Tests benutzt)
 ├── config.rs           Alle Umgebungsvariablen an einer Stelle
 ├── error.rs            Fehlertypen: HTML-Fehlerseite vs. JSON-Fehler
-├── templates.rs        Ein Struct je Seite
+├── templates.rs        Ein Struct je Seite, Name und Farben (branding)
+├── pwa.rs              Manifest, Service Worker, Offline-Seite
 │
 ├── domain/             ← FACHLOGIK. Kennt weder HTTP noch Templates.
 │   ├── user.rs
 │   ├── api_token.rs
+│   ├── login_attempt.rs  Bremse gegen Passwort-Raten
 │   └── note.rs           Beispielressource zum Kopieren
 │
 ├── auth/
 │   ├── role.rs           Rollen und ihre Rangfolge
+│   ├── scope.rs          Was ein App-Token darf
 │   ├── password.rs       Argon2id
 │   ├── token.rs          Erzeugen und Prüfen der App-Tokens
 │   ├── session.rs        Anmelden/Abmelden
 │   ├── csrf.rs           Herkunftsprüfung
-│   └── extract.rs        CurrentUser, AdminUser, ApiUser …
+│   ├── client_ip.rs      Client-Adresse, auch hinter einem Proxy
+│   └── extract.rs        CurrentUser, AdminUser, ApiClient, NotesRead …
 │
-├── auth/scope.rs         Was ein App-Token darf
+├── mail/               ← E-Mail: Mail::to(..).subject(..).text(..)
+│   ├── mod.rs            Mailer und Mail
+│   └── templates.rs      Ein Struct je HTML-Mail
 │
 ├── web/                ← HTML-Routen (Session-Cookie, Rollen)
 │   ├── account.rs        eigenes Konto
 │   ├── admin.rs          Benutzerverwaltung
-│   └── tokens.rs         App-Tokens (nur Administratoren)
+│   ├── tokens.rs         App-Tokens (nur Administratoren)
+│   └── system.rs         wirksame Konfiguration, Testmail
 └── api/                ← JSON-Routen (Bearer-Token, Scopes)
 
-templates/              Askama-Templates
-assets/css/
-├── theme.css           ← HIER das Aussehen ändern
-└── components.css      Komponentenklassen (.btn, .card, …)
+templates/
+├── layout/             Grundgerüst und angemeldeter Rahmen
+├── pages/              eine Datei je Seite
+├── partials/           htmx-Fragmente
+├── components/         Makros (Zeitstempel, Listeneinträge)
+└── mail/               HTML-Mails, nur Inline-Styles
+assets/
+├── css/theme.css       ← HIER das Aussehen ändern
+├── css/components.css  Komponentenklassen (.btn, .card, …)
+└── icons/              Quelle der App-Icons (SVG)
+static/icons/           erzeugte PNG-Icons — nach Änderung ./scripts/icons.sh
 migrations/             SQL-Migrationen
 docs/                   Ausführliche Dokumentation
 ```
@@ -126,6 +142,7 @@ just css-watch    # Stylesheet beobachten (zweites Terminal)
 just test         # Tests
 just check        # Formatierung + Clippy + Tests
 just db-shell     # psql öffnen
+just mail-up      # Mailpit starten, Mails ansehen unter http://localhost:58025
 just db-reset     # Datenbank verwerfen und neu anlegen
 just up           # alles im Container starten
 ```

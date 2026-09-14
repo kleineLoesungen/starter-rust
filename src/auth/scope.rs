@@ -6,7 +6,7 @@
 //! Eine neue Berechtigung hinzufuegen:
 //!   1. Konstante unten ergaenzen und in `ALL` eintragen
 //!   2. Extractor in `src/auth/extract.rs` erzeugen:
-//!      `scope_extractor!(BerichteLesen, BERICHTE_READ);`
+//!      `scope_extractor!(ReportsRead, REPORTS_READ, "Token mit Scope `reports:read`.");`
 //!   3. Endpunkt in `docs/API.md` beschreiben
 
 pub const NOTES_READ: &str = "notes:read";

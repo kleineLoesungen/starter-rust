@@ -18,6 +18,11 @@ Diese Liste durchgehen:
       Bremse pro IP mit einem selbst gesetzten `X-Forwarded-For` umgehen.
 - [ ] `DATABASE_URL` mit `?sslmode=require`, wenn die Datenbank über ein
       Netz erreichbar ist.
+- [ ] `SMTP_URL` und `MAIL_FROM` gesetzt, danach unter **System** eine Testmail
+      verschickt. Ohne `SMTP_URL` geht keine Mail raus — sie erscheinen nur im Log.
+- [ ] `APP_NAME`, `APP_SHORT_NAME`, `PWA_THEME_COLOR` gesetzt. Die Werte landen
+      im Manifest; eine bereits installierte App übernimmt Namensänderungen je
+      nach Gerät erst verzögert oder nach Neuinstallation.
 - [ ] Datenbanksicherung eingerichtet **und einmal zurückgespielt**.
 - [ ] `RUST_LOG=starter=info` — `debug` protokolliert deutlich mehr.
 - [ ] Erstes Konto anlegen und prüfen, dass es Administrator ist.
@@ -46,6 +51,56 @@ damit auch die Datenbankverbindung, nicht nur den Prozess.
 **Passwörter nicht als `-e` übergeben**, sie stehen sonst in `docker inspect`
 und in der Shell-Historie. Docker Secrets, Kubernetes Secrets oder eine
 `--env-file` mit engen Dateirechten benutzen.
+
+---
+
+## E-Mail
+
+Der Versandweg hängt allein an `SMTP_URL`:
+
+```bash
+# TLS direkt (Port 465)
+SMTP_URL=smtps://benutzer:passwort@mail.example.com
+# STARTTLS (Port 587)
+SMTP_URL=smtp://benutzer:passwort@mail.example.com:587?tls=required
+```
+
+Sonderzeichen im Passwort URL-kodieren (`@` → `%40`, `:` → `%3A`, `/` → `%2F`),
+sonst wird die Adresse falsch zerlegt.
+
+`MAIL_FROM` in Anführungszeichen setzen, wenn es einen Namen enthält —
+`MAIL_FROM="Mein Verein <noreply@example.com>"`. Ohne Anführungszeichen bricht
+der Start mit einer Meldung ab; das ist Absicht, siehe unten.
+
+Unter **System** (`/admin/system`) zeigt die Anwendung den wirksamen Versandweg
+— ohne Passwort — und verschickt auf Knopfdruck eine Testmail. Schlägt sie
+fehl, steht dort die Meldung des Mailservers.
+
+---
+
+## Installierbare App (PWA)
+
+Die Anwendung bringt Manifest, Icons und einen Service Worker mit. Browser
+bieten die Installation aber **nur über HTTPS** an (oder auf `localhost`). Im
+lokalen Netz per `http://192.168…` gibt es weder Installation noch
+Offline-Seite — das ist eine Vorgabe der Browser, kein Fehler.
+
+Der Service Worker speichert **keine Seiten** zwischen, nur Stylesheet, htmx
+und Icons. Ohne Netz erscheint eine Offline-Seite. Das ist bewusst so: Eine
+angemeldete, serverseitig gerenderte Anwendung aus dem Speicher zu bedienen,
+hieße veraltete Daten zeigen — oder nach dem Abmelden noch die Inhalte des
+vorherigen Benutzers.
+
+Eigene Icons: SVG unter `assets/icons/` ersetzen, dann `./scripts/icons.sh`.
+
+---
+
+## `.env` im Betrieb
+
+Eine fehlerhafte `.env` bricht den Start ab, statt still ignoriert zu werden.
+Der Hintergrund: Der Parser hört an der ersten kaputten Zeile auf, und alle
+Zeilen danach fehlen ebenfalls. Ein ungequotetes `MAIL_FROM=Name <a@b>` hätte
+so still ein späteres `COOKIE_SECURE=true` verschluckt.
 
 ---
 

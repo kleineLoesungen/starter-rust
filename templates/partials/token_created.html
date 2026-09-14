@@ -34,7 +34,7 @@
     // Der Klartext ist nur dieses eine Mal zu sehen. Wenn die Seite gescrollt
     // war, liegt der Kasten sonst ausserhalb des Sichtbereichs — dann geht das
     // Token verloren, ohne dass es jemand merkt.
-    const kasten = document.getElementById("new-token");
-    if (kasten) kasten.scrollIntoView({ behavior: "smooth", block: "center" });
+    const box = document.getElementById("new-token");
+    if (box) box.scrollIntoView({ behavior: "smooth", block: "center" });
   })();
 </script>

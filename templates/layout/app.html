@@ -3,7 +3,10 @@
 
   Zwei Bildschirmgroessen, eine Quelle:
 
-  * Ab `md` steht die Navigation waagerecht in der Kopfzeile.
+  * Ab `lg` (1024 px) steht die Navigation waagerecht in der Kopfzeile.
+    Nicht schon ab `md`: Mit sechs Eintraegen fuer Administratoren passt die
+    Kopfzeile bei 768 px nicht mehr — Tablets im Hochformat bekommen deshalb
+    die untere Leiste.
   * Darunter sitzt sie als Leiste UNTEN — dort sind beim Halten des Geraets
     die Daumen. Was nicht in die Leiste passt, steckt hinter „Mehr".
 
@@ -14,15 +17,16 @@
 #}
 {% extends "layout/base.html" %}
 
-{% macro nav_links(layout, klasse) %}
-  <a href="/dashboard" class="{{ klasse }} {% if layout.is_active("/dashboard") %}nav-link-active{% endif %}">Übersicht</a>
-  <a href="/notes" class="{{ klasse }} {% if layout.is_active("/notes") %}nav-link-active{% endif %}">Notizen</a>
+{% macro nav_links(layout, class_name) %}
+  <a href="/dashboard" class="{{ class_name }} {% if layout.is_active("/dashboard") %}nav-link-active{% endif %}">Übersicht</a>
+  <a href="/notes" class="{{ class_name }} {% if layout.is_active("/notes") %}nav-link-active{% endif %}">Notizen</a>
   {% if layout.is_moderator() %}
-    <a href="/moderation" class="{{ klasse }} {% if layout.is_active("/moderation") %}nav-link-active{% endif %}">Moderation</a>
+    <a href="/moderation" class="{{ class_name }} {% if layout.is_active("/moderation") %}nav-link-active{% endif %}">Moderation</a>
   {% endif %}
   {% if layout.is_admin() %}
-    <a href="/admin/users" class="{{ klasse }} {% if layout.is_active("/admin/users") %}nav-link-active{% endif %}">Benutzer</a>
-    <a href="/admin/tokens" class="{{ klasse }} {% if layout.is_active("/admin/tokens") %}nav-link-active{% endif %}">Tokens</a>
+    <a href="/admin/users" class="{{ class_name }} {% if layout.is_active("/admin/users") %}nav-link-active{% endif %}">Benutzer</a>
+    <a href="/admin/tokens" class="{{ class_name }} {% if layout.is_active("/admin/tokens") %}nav-link-active{% endif %}">Tokens</a>
+    <a href="/admin/system" class="{{ class_name }} {% if layout.is_active("/admin/system") %}nav-link-active{% endif %}">System</a>
   {% endif %}
 {% endmacro %}
 
@@ -40,7 +44,7 @@
       </a>
 
       {# Breite Bildschirme: Navigation direkt in der Kopfzeile. #}
-      <nav class="hidden items-center gap-1 md:flex" aria-label="Hauptnavigation">
+      <nav class="hidden items-center gap-1 lg:flex" aria-label="Hauptnavigation">
         {% call nav_links(layout, "nav-link") %}{% endcall %}
       </nav>
 
@@ -51,7 +55,7 @@
         </button>
 
         {% if let Some(user) = layout.user %}
-          <div class="ml-1 hidden items-center gap-2 md:flex">
+          <div class="ml-1 hidden items-center gap-2 lg:flex">
             <a href="/account"
                class="grid size-8 place-items-center rounded-full bg-brand-subtle text-xs font-semibold text-brand transition-opacity hover:opacity-80"
                title="Mein Konto — {{ user.display_name }} ({{ user.role.label() }})">
@@ -67,11 +71,11 @@
   </header>
 
   {# `pb-24` haelt den Inhalt oberhalb der unteren Leiste. #}
-  <main class="container-app flex-1 pt-8 pb-24 md:pb-8">
+  <main class="container-app flex-1 pt-8 pb-24 lg:pb-8">
     {% block main %}{% endblock %}
   </main>
 
-  <footer class="border-t border-border py-6 pb-24 md:pb-6">
+  <footer class="border-t border-border py-6 pb-24 lg:pb-6">
     <div class="container-app flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-subtle">
       <span>{{ layout.app_name }}</span>
       <a href="/styleguide" class="hover:text-content">Styleguide</a>
@@ -81,7 +85,7 @@
 </div>
 
 {# --- Untere Leiste, nur auf schmalen Bildschirmen ------------------------ #}
-<nav class="tabbar md:hidden" aria-label="Hauptnavigation">
+<nav class="tabbar lg:hidden" aria-label="Hauptnavigation">
   <a href="/dashboard" class="tab {% if layout.is_active("/dashboard") %}tab-active{% endif %}">
     <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"
          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -109,7 +113,7 @@
   {% endif %}
 
   <button type="button" class="tab" data-menu-toggle
-          aria-expanded="false" aria-controls="hauptmenue" aria-label="Mehr anzeigen">
+          aria-expanded="false" aria-controls="main-menu" aria-label="Mehr anzeigen">
     <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"
          stroke-width="2" stroke-linecap="round" aria-hidden="true">
       <path d="M5 12h.01M12 12h.01M19 12h.01"/>
@@ -123,8 +127,8 @@
   ueber eigene CSS-Regeln: Utilities stehen in der obersten Kaskadenebene und
   gewinnen damit zuverlaessig gegen alles andere.
 #}
-<div id="hauptmenue" class="hidden md:hidden">
-  <div class="sheet-hintergrund" data-menue-hintergrund></div>
+<div id="main-menu" class="hidden lg:hidden">
+  <div class="sheet-backdrop" data-menu-backdrop></div>
 
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Menü">
     <div class="mx-auto mt-2 h-1 w-10 rounded-full bg-border-strong" aria-hidden="true"></div>
@@ -164,35 +168,35 @@
 
   // --- Menü der unteren Leiste --------------------------------------------
   (() => {
-    const knopf = document.querySelector("[data-menu-toggle]");
-    const menue = document.getElementById("hauptmenue");
-    if (!knopf || !menue) return;
+    const toggle = document.querySelector("[data-menu-toggle]");
+    const menu = document.getElementById("main-menu");
+    if (!toggle || !menu) return;
 
-    const istOffen = () => !menue.classList.contains("hidden");
+    const isOpen = () => !menu.classList.contains("hidden");
 
-    const setzen = (offen) => {
-      menue.classList.toggle("hidden", !offen);
-      knopf.setAttribute("aria-expanded", String(offen));
-      knopf.setAttribute("aria-label", offen ? "Menü schließen" : "Mehr anzeigen");
+    const setOpen = (open) => {
+      menu.classList.toggle("hidden", !open);
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.setAttribute("aria-label", open ? "Menü schließen" : "Mehr anzeigen");
       // Hintergrund nicht mitscrollen lassen, solange das Menü offen ist.
-      document.body.style.overflow = offen ? "hidden" : "";
+      document.body.style.overflow = open ? "hidden" : "";
     };
 
-    knopf.addEventListener("click", () => setzen(!istOffen()));
+    toggle.addEventListener("click", () => setOpen(!isOpen()));
 
     // Tipp auf den abgedunkelten Hintergrund schließt.
-    menue.querySelector("[data-menue-hintergrund]").addEventListener("click", () => setzen(false));
+    menu.querySelector("[data-menu-backdrop]").addEventListener("click", () => setOpen(false));
 
     // Mit Escape schließen — erwartetes Verhalten für ein offenes Menü.
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") setzen(false);
+      if (e.key === "Escape") setOpen(false);
     });
 
     // Wird das Fenster breit, übernimmt die Kopfzeile wieder. Das Menü muss
     // dann zu sein, sonst steht es beim Zurückdrehen unerwartet offen — und
     // `overflow: hidden` bliebe am Body kleben.
-    window.matchMedia("(min-width: 48rem)").addEventListener("change", (e) => {
-      if (e.matches) setzen(false);
+    window.matchMedia("(min-width: 64rem)").addEventListener("change", (e) => {
+      if (e.matches) setOpen(false);
     });
   })();
 </script>

@@ -8,6 +8,7 @@ pub mod admin;
 pub mod auth;
 pub mod notes;
 pub mod pages;
+pub mod system;
 pub mod tokens;
 
 use axum::Router;
@@ -45,4 +46,6 @@ pub fn routes() -> Router<AppState> {
         .route("/admin/users/{id}/delete", post(admin::delete))
         .route("/admin/tokens", get(tokens::index).post(tokens::create))
         .route("/admin/tokens/{id}/revoke", post(tokens::revoke))
+        .route("/admin/system", get(system::index))
+        .route("/admin/system/testmail", post(system::testmail))
 }

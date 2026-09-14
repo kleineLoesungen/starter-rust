@@ -10,18 +10,12 @@ use sqlx::PgPool;
 use starter::auth::{Role, scope};
 use starter::config::Config;
 use starter::domain::{api_token, user};
+use starter::mail::Mailer;
 use tower::ServiceExt;
 
 /// Baut die Anwendung fuer einen Test.
 async fn anwendung(db: PgPool) -> axum::Router {
-    let config = Config {
-        database_url: String::new(),
-        bind_addr: "127.0.0.1:0".parse().unwrap(),
-        db_max_connections: 5,
-        cookie_secure: false,
-        public_url: "http://localhost:3000".into(),
-        trust_proxy: false,
-    };
+    let config = Config::for_tests();
     let (router, aufraeumen) = starter::app::build(db, config)
         .await
         .expect("Anwendung baubar");
@@ -657,7 +651,7 @@ async fn navigation_ist_auf_beiden_bildschirmgroessen_vollstaendig(db: PgPool) {
 
     assert!(html.contains(r#"class="tabbar"#), "Untere Leiste fehlt");
     assert!(html.contains("data-menu-toggle"), "Knopf für „Mehr“ fehlt");
-    assert!(html.contains(r#"id="hauptmenue""#), "Menü fehlt");
+    assert!(html.contains(r#"id="main-menu""#), "Menü fehlt");
 
     // Kopfzeile: Navigation für breite Bildschirme.
     let kopf_start = html.find("<header").expect("Kopfzeile vorhanden");
@@ -669,7 +663,7 @@ async fn navigation_ist_auf_beiden_bildschirmgroessen_vollstaendig(db: PgPool) {
     );
 
     // Menü: dieselben Einträge plus Konto und Abmelden.
-    let menue_start = html.find(r#"id="hauptmenue""#).expect("Menü vorhanden");
+    let menue_start = html.find(r#"id="main-menu""#).expect("Menü vorhanden");
     let menue = &html[menue_start..];
     assert!(
         menue.contains(r#"href="/admin/tokens""#),
@@ -793,7 +787,7 @@ async fn erfolgreiche_anmeldung_loescht_die_vorgeschichte(db: PgPool) {
     fehlversuch(&app, "vergesslich@example.com").await;
     anmelden(&app, "vergesslich@example.com", "einsehrlangespasswort").await;
 
-    let (offen,): (i64,) = sqlx::query_as("SELECT count(*) FROM login_versuche")
+    let (offen,): (i64,) = sqlx::query_as("SELECT count(*) FROM login_attempts")
         .fetch_one(&db)
         .await
         .unwrap();
@@ -823,4 +817,295 @@ async fn die_sperre_gilt_nur_fuer_das_betroffene_konto(db: PgPool) {
 
     let cookie = anmelden(&app, "unbeteiligt@example.com", "einsehrlangespasswort").await;
     assert!(cookie.contains("starter_session"));
+}
+
+// --- Fehlerseite -------------------------------------------------------------
+
+#[sqlx::test]
+async fn fehlerseite_gibt_eingaben_nur_maskiert_aus(db: PgPool) {
+    // Regressionstest fuer ein reflektiertes XSS: Die Fehlerseite wird ohne
+    // Askama gebaut, und manche Meldungen enthalten die Eingabe des Benutzers
+    // ("Unbekannte Rolle: …"). Ohne Maskierung liefe eingeschleustes Skript.
+    let a = admin(&db, "xss@example.com").await;
+    let app = anwendung(db).await;
+    let cookie = anmelden(&app, "xss@example.com", "einsehrlangespasswort").await;
+
+    let antwort = app
+        .oneshot(
+            Request::post(format!("/admin/users/{}", a.id))
+                .header("sec-fetch-site", "same-origin")
+                .header(header::COOKIE, &cookie)
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "display_name=X&email=xss@example.com&role=%3Cscript%3Ealert(1)%3C%2Fscript%3E",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(antwort.status(), StatusCode::BAD_REQUEST);
+    let html = text(antwort).await;
+    assert!(
+        !html.contains("<script>alert(1)</script>"),
+        "Eingabe ungefiltert in der Seite"
+    );
+    assert!(
+        html.contains("&lt;script&gt;"),
+        "Eingabe muss maskiert erscheinen"
+    );
+}
+
+// --- Installierbare App (PWA) ----------------------------------------------
+
+#[sqlx::test]
+async fn manifest_nennt_name_farben_und_vorhandene_icons(db: PgPool) {
+    let app = anwendung(db).await;
+    let antwort = app
+        .clone()
+        .oneshot(
+            Request::get("/manifest.webmanifest")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(antwort.status(), StatusCode::OK);
+    assert_eq!(
+        antwort.headers().get(header::CONTENT_TYPE).unwrap(),
+        "application/manifest+json"
+    );
+
+    let manifest: serde_json::Value = serde_json::from_str(&text(antwort).await).unwrap();
+    assert_eq!(manifest["name"], "Starter");
+    assert_eq!(manifest["display"], "standalone");
+    assert_eq!(manifest["theme_color"], "#3370c7");
+
+    // Jedes eingetragene Icon muss auch wirklich ausgeliefert werden — ein
+    // Tippfehler im Pfad macht die App sonst still nicht installierbar.
+    let icons = manifest["icons"].as_array().expect("icons ist eine Liste");
+    assert!(icons.iter().any(|i| i["sizes"] == "192x192"));
+    assert!(icons.iter().any(|i| i["sizes"] == "512x512"));
+    for icon in icons {
+        let pfad = icon["src"].as_str().unwrap();
+        let antwort = app
+            .clone()
+            .oneshot(Request::get(pfad).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(antwort.status(), StatusCode::OK, "Icon fehlt: {pfad}");
+    }
+}
+
+#[sqlx::test]
+async fn service_worker_liegt_im_wurzelpfad_und_wird_nicht_zwischengespeichert(db: PgPool) {
+    let app = anwendung(db).await;
+    let antwort = app
+        .oneshot(Request::get("/sw.js").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(antwort.status(), StatusCode::OK);
+    assert!(
+        antwort
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("application/javascript")
+    );
+    // Sonst haengt nach einem Deployment der alte Worker fest.
+    assert_eq!(
+        antwort.headers().get(header::CACHE_CONTROL).unwrap(),
+        "no-cache"
+    );
+
+    let skript = text(antwort).await;
+    assert!(
+        !skript.contains("__VERSION__"),
+        "Cache-Version wurde nicht eingesetzt"
+    );
+    // Seiten duerfen nie aus dem Speicher kommen, nur die Offline-Seite als Ersatz.
+    assert!(skript.contains(r#"request.mode === "navigate""#));
+    assert!(skript.contains(r#"caches.match("/offline")"#));
+}
+
+#[sqlx::test]
+async fn offline_seite_ist_ohne_anmeldung_erreichbar(db: PgPool) {
+    // Der Service Worker legt sie beim Installieren ab — dabei ist niemand
+    // angemeldet. Eine Umleitung zum Login waere hier ein stiller Fehler.
+    let app = anwendung(db).await;
+    let antwort = app
+        .oneshot(Request::get("/offline").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(antwort.status(), StatusCode::OK);
+    assert!(text(antwort).await.contains("Keine Verbindung"));
+}
+
+#[sqlx::test]
+async fn jede_seite_verweist_auf_manifest_und_leistenfarbe(db: PgPool) {
+    let app = anwendung(db).await;
+    let html = text(
+        app.oneshot(Request::get("/login").body(Body::empty()).unwrap())
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(html.contains(r#"<link rel="manifest" href="/manifest.webmanifest">"#));
+    assert!(html.contains(r##"<meta name="theme-color" content="#3370c7">"##));
+    assert!(html.contains("apple-touch-icon"));
+}
+
+// --- Systemseite und Mail ---------------------------------------------------
+
+#[sqlx::test]
+async fn systemseite_ist_nur_fuer_administratoren(db: PgPool) {
+    admin(&db, "chef@example.com").await;
+    user::create(
+        &db,
+        "normal@example.com",
+        "Normal",
+        "einsehrlangespasswort",
+        Role::User,
+    )
+    .await
+    .unwrap();
+    let app = anwendung(db).await;
+
+    let normal = anmelden(&app, "normal@example.com", "einsehrlangespasswort").await;
+    let antwort = app
+        .clone()
+        .oneshot(
+            Request::get("/admin/system")
+                .header(header::COOKIE, &normal)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(antwort.status(), StatusCode::FORBIDDEN);
+
+    let chef = anmelden(&app, "chef@example.com", "einsehrlangespasswort").await;
+    let antwort = app
+        .oneshot(
+            Request::get("/admin/system")
+                .header(header::COOKIE, &chef)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(antwort.status(), StatusCode::OK);
+}
+
+#[sqlx::test]
+async fn systemseite_zeigt_mailserver_aber_nie_das_passwort(db: PgPool) {
+    admin(&db, "chefin@example.com").await;
+    let mut config = Config::for_tests();
+    config.mail.smtp_url = Some("smtps://versand:streng-geheim-42@mail.example.com:465".into());
+    let (app, aufraeumen) = starter::app::build(db, config).await.unwrap();
+    aufraeumen.abort();
+
+    let cookie = anmelden(&app, "chefin@example.com", "einsehrlangespasswort").await;
+    let html = text(
+        app.oneshot(
+            Request::get("/admin/system")
+                .header(header::COOKIE, &cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+
+    assert!(html.contains("mail.example.com:465"));
+    assert!(html.contains("versand"));
+    assert!(html.contains("Passwort gesetzt"));
+    assert!(
+        !html.contains("streng-geheim-42"),
+        "Das SMTP-Passwort darf nie angezeigt werden"
+    );
+}
+
+/// Anwendung mit einem Mailer, der Mails sammelt statt verschickt.
+async fn anwendung_mit_postfach(
+    db: PgPool,
+) -> (
+    axum::Router,
+    std::sync::Arc<std::sync::Mutex<Vec<starter::mail::Mail>>>,
+) {
+    let (mailer, postfach) = Mailer::in_memory();
+    let (app, aufraeumen) = starter::app::build_with_mailer(db, Config::for_tests(), mailer)
+        .await
+        .unwrap();
+    aufraeumen.abort();
+    (app, postfach)
+}
+
+#[sqlx::test]
+async fn testmail_kommt_mit_text_und_html_an(db: PgPool) {
+    admin(&db, "postbote@example.com").await;
+    let (app, postfach) = anwendung_mit_postfach(db).await;
+    let cookie = anmelden(&app, "postbote@example.com", "einsehrlangespasswort").await;
+
+    let antwort = app
+        .oneshot(
+            Request::post("/admin/system/testmail")
+                .header("sec-fetch-site", "same-origin")
+                .header(header::COOKIE, &cookie)
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from("to=empfaenger%40example.com"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(antwort.status(), StatusCode::SEE_OTHER);
+    let ziel = antwort
+        .headers()
+        .get(header::LOCATION)
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert_eq!(ziel, "/admin/system?mail=sent");
+    assert!(
+        !ziel.contains("empfaenger"),
+        "Die Adresse gehoert nicht in die URL"
+    );
+
+    let mails = postfach.lock().unwrap();
+    assert_eq!(mails.len(), 1);
+    let mail = &mails[0];
+    assert_eq!(mail.recipient(), "empfaenger@example.com");
+    assert!(mail.subject_line().contains("Starter"));
+    assert!(mail.text_body().contains("funktioniert"));
+    let html = mail.html_body().expect("HTML-Fassung vorhanden");
+    assert!(html.contains("#3370c7"), "Markenfarbe fehlt im Mail-Layout");
+}
+
+#[sqlx::test]
+async fn testmail_an_ungueltige_adresse_wird_abgewiesen(db: PgPool) {
+    admin(&db, "sorgfalt@example.com").await;
+    let (app, postfach) = anwendung_mit_postfach(db).await;
+    let cookie = anmelden(&app, "sorgfalt@example.com", "einsehrlangespasswort").await;
+
+    let antwort = app
+        .oneshot(
+            Request::post("/admin/system/testmail")
+                .header("sec-fetch-site", "same-origin")
+                .header(header::COOKIE, &cookie)
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from("to=keine-adresse"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(antwort.status(), StatusCode::BAD_REQUEST);
+    assert!(text(antwort).await.contains("Versand fehlgeschlagen"));
+    assert!(postfach.lock().unwrap().is_empty());
 }

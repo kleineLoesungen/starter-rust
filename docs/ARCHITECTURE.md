@@ -145,6 +145,77 @@ für Fremde.
 
 ---
 
+## Konfiguration
+
+Alles kommt aus Umgebungsvariablen und wird an **einer** Stelle gelesen:
+`src/config.rs`. Zusammengehörige Werte bilden eigene Structs (`Branding`,
+`MailConfig`).
+
+Zwei Entscheidungen dazu:
+
+**Fehler beim Start, nicht im Betrieb.** Farben werden beim Einlesen auf ihr
+Format geprüft, `MAIL_FROM` und `SMTP_URL` beim Bau des Mailers. Eine
+fehlerhafte `.env` bricht den Start ab — der Parser hört sonst an der ersten
+kaputten Zeile auf und verschluckt still alle folgenden.
+
+**Kein Einstellungsmenü.** Name, Farben und Mailserver lassen sich in der
+Oberfläche nur ansehen, nicht ändern (`/admin/system`). Es sind
+Betriebsentscheidungen, die mit dem Deployment versioniert gehören. Außerdem
+wäre die Kontrolle vorgetäuscht: Eine installierte App übernimmt einen neuen
+Namen oder ein neues Icon je nach Gerät erst spät oder gar nicht.
+
+`templates::branding()` ist eine einmal beim Start gesetzte globale Ablage.
+Das ist bewusst die Ausnahme: `Layout::new` wird in jedem Handler aufgerufen,
+und einen Wert, der sich zur Laufzeit nie ändert, überall durchzureichen, wäre
+viel Rauschen ohne Gewinn.
+
+---
+
+## E-Mail
+
+`src/mail/` kapselt `lettre` hinter einer kleinen Schnittstelle:
+
+```rust
+state.mailer.send(Mail::to(&adresse).subject("…").text("…")).await?;
+```
+
+Der `Mailer` kennt drei Versandwege, ausgewählt beim Start:
+
+| Versandweg | wann | Wirkung |
+|---|---|---|
+| SMTP | `SMTP_URL` gesetzt | echter Versand |
+| Log | `SMTP_URL` fehlt | Empfänger und Betreff im Log, nichts wird verschickt |
+| In-Memory | nur Tests (`Mailer::in_memory()`) | Mails werden gesammelt und lassen sich prüfen |
+
+Die Adressprüfung läuft für **alle** drei gleich. Sonst würden Tests etwas
+anderes prüfen als die Produktion.
+
+Der Inhalt einer Mail erscheint im Log nur auf Stufe `debug`. Später können
+darin Links zum Zurücksetzen eines Passworts stehen — die sollen nicht im
+Produktionslog landen, nur weil `SMTP_URL` vergessen wurde.
+
+Lokal fängt Mailpit alle Mails ab (`just mail-up`, Ansicht auf Port 58025).
+
+---
+
+## Installierbare App
+
+`src/pwa.rs` liefert Manifest, Service Worker und Offline-Seite.
+
+Der Service Worker liegt unter `/sw.js` und nicht unter `/static/`: Ein Worker
+steuert nur Seiten unterhalb seines eigenen Pfads.
+
+**Er speichert keine Seiten zwischen.** Nur `/static/…` wird vorgehalten, ohne
+Netz erscheint eine Offline-Seite. Bei einer angemeldeten, serverseitig
+gerenderten Anwendung hieße Seiten-Caching: veraltete Daten, oder nach dem
+Abmelden die Inhalte des vorherigen Benutzers.
+
+Jeder Serverstart erzeugt eine neue Cache-Version. Der Browser erkennt daran
+einen geänderten Worker und verwirft den alten Zwischenspeicher — nach einem
+Deployment gibt es kein veraltetes Stylesheet.
+
+---
+
 ## Ausliefern
 
 Ein mehrstufiges Dockerfile erzeugt ein Abbild ohne Rust-Werkzeugkette. Die
